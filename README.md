@@ -1,6 +1,8 @@
 certin
 =======
 
+![test](https://github.com/joemiller/certin/workflows/test/badge.svg)
+
 TODO
 
 ------------------------------------------------------------------------------
