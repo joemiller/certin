@@ -3,29 +3,49 @@ certin
 
 ![test](https://github.com/joemiller/certin/workflows/test/badge.svg)
 
-TODO
+TODO .. document
+
+TODO .. license. mit probably
 
 ------------------------------------------------------------------------------
 
-TODO
+NOTES
 ====
 
-API
+Example uses:
 
-* simple self-signed cert
+```go
+type Request struct {
+	CN       string
+	O        []string
+	OU       []string
+	SANs     []string
+	Duration time.Duration
+	IsCA     bool
+	KeyType  string
+}
+
+type KeyAndCert struct {
+	Certificate *x509.Certificate
+	PrivateKey  crypto.PrivateKey
+	PublicKey   crypto.PublicKey
+}
+```
+
+* simple self-signed cert:
 
 ```go
 // the first param to NewCert is the parent (signing) CA cert. nil creates a self-signed cert
 root, err := certin.NewCert(nil, certin.Request{CN: "self-signed"}))
 ```
 
-* root CA cert
+* root CA cert:
 
 ```go
 root, err := certin.NewCert(nil, certin.Request{CN: "root CA", IsCA: true}))
 ```
 
-* root and intermediate CA certs
+* root and intermediate CA certs:
 
 ```go
 root, err := NewCert(nil, Request{CN: "root", IsCA: true})
@@ -33,7 +53,9 @@ root, err := NewCert(nil, Request{CN: "root", IsCA: true})
 interm, err := NewCert(root, Request{CN: " intermediate", IsCA: true})
 ```
 
-* yubikey attestation cert chain example
+* Create cert from `x509.Certificate` template instead of `certin.Request`. This allows for more
+  control over the contents of the cert.
+
 ```go
 root, err := NewCert(nil, Request{CN: "yubico root", IsCA: true})
 interm, err := NewCert(root, Request{CN: "yubikey attestation intermediate", IsCA: true})
