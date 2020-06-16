@@ -28,4 +28,5 @@ jobs:
         shell: bash # force windows to use git-bash for access to curl
 
       - run: golangci-lint run --timeout=5m -v
+        shell: bash
       - run: go test -v -cover ./...
