@@ -26,6 +26,7 @@ var (
 	DefaultDuration = 365 * 24 * time.Hour
 )
 
+// TODO document
 type Request struct {
 	CN       string
 	O        []string
@@ -36,18 +37,19 @@ type Request struct {
 	KeyType  string
 }
 
+// TODO document
 type KeyAndCert struct {
 	Certificate *x509.Certificate
 	PrivateKey  crypto.PrivateKey
 	PublicKey   crypto.PublicKey
 }
 
+// TODO document
 func NewCert(parent *KeyAndCert, req Request) (*KeyAndCert, error) {
-	keytype := DefaultKeyType
-	if req.KeyType != "" {
-		keytype = req.KeyType
+	if req.KeyType == "" {
+		req.KeyType = DefaultKeyType
 	}
-	priv, err := GenerateKey(keytype)
+	priv, err := GenerateKey(req.KeyType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate key: %v", err)
 	}
@@ -130,13 +132,22 @@ func NewCert(parent *KeyAndCert, req Request) (*KeyAndCert, error) {
 	return bundle, nil
 }
 
-// func NewCertFromX509Template(parent *KeyAndCert, private *crypto.PrivateKey templ *x509.Certificate) (*KeyAndCert, error) {
+// TODO document
 func NewCertFromX509Template(parent *KeyAndCert, templ *x509.Certificate) (*KeyAndCert, error) {
 	priv, err := GenerateKey(DefaultKeyType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate key: %v", err)
 	}
 	pub := priv.(crypto.Signer).Public()
+
+	// generate a random serial number if the template did not provide one. Go won't sign a cert without a serial
+	if templ.SerialNumber == nil {
+		serial, err := randomSerialNumber()
+		if err != nil {
+			return nil, err
+		}
+		templ.SerialNumber = serial
+	}
 
 	// if parent is nil, this will be a self signed cert
 	signerCert := templ
@@ -188,9 +199,9 @@ func NewCertFromX509Template(parent *KeyAndCert, templ *x509.Certificate) (*KeyA
 // }
 
 // GenerateKey generates a private/public key pair. Valid keytypes are:
-// rsa-2048, rsa-3072, rsa-4096
-// ecdsa-224, ecdsa-256, ecdsa-384, ecdsa-521
-// ed25519
+//   rsa-2048, rsa-3072, rsa-4096
+//   ecdsa-224, ecdsa-256, ecdsa-384, ecdsa-521
+//   ed25519
 func GenerateKey(keyType string) (crypto.PrivateKey, error) {
 	switch keyType {
 	case "rsa-2048":
@@ -214,6 +225,7 @@ func GenerateKey(keyType string) (crypto.PrivateKey, error) {
 	return nil, fmt.Errorf("unknown keyType %s", keyType)
 }
 
+// TODO document
 func Export(keyFile, certFile string, cert *KeyAndCert) error {
 	if err := ExportPrivateKey(keyFile, cert.PrivateKey); err != nil {
 		return err
@@ -224,6 +236,7 @@ func Export(keyFile, certFile string, cert *KeyAndCert) error {
 	return nil
 }
 
+// TODO document
 func ExportPrivateKey(file string, priv crypto.PrivateKey) error {
 	derBytes, err := x509.MarshalPKCS8PrivateKey(priv)
 	if err != nil {
@@ -235,6 +248,7 @@ func ExportPrivateKey(file string, priv crypto.PrivateKey) error {
 		0600)
 }
 
+// TODO document
 func ExportPublicKey(file string, pub crypto.PublicKey) error {
 	derBytes, err := x509.MarshalPKIXPublicKey(pub)
 	if err != nil {
@@ -246,6 +260,7 @@ func ExportPublicKey(file string, pub crypto.PublicKey) error {
 		0600)
 }
 
+// TODO document
 func ExportCert(file string, cert *x509.Certificate) error {
 	err := ioutil.WriteFile(
 		file,
