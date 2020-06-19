@@ -2,3 +2,5 @@
 .vscode/
 coverage.out
 cover.out
+/certin
+dist/

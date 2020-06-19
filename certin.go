@@ -26,28 +26,54 @@ var (
 	DefaultDuration = 365 * 24 * time.Hour
 )
 
+// Request is a simplified configuration for generating a keypair and certificate
+// with the NewCert() func. The most common attributes for a keypair and cert are
+// available but if you need more control over the certificate contents you should
+// create a x509.Certificate template and use the NewCertFromX509Template() func
+// instead.
 type Request struct {
-	CN       string
-	O        []string
-	OU       []string
-	SANs     []string
+	// CommonName to use in the certificate Subject
+	CN string
+
+	// Organization(s) to include in the Subject
+	O []string
+
+	// Organizationl Units(s) to include in the Subject
+	OU []string
+
+	// SANs is a list of SubjectAltNames to include in the certificate. DNS, IP, Email, and URIs are
+	// supported.
+	SANs []string
+
+	// Certiicate duration. Default is 1 year if not specified
 	Duration time.Duration
-	IsCA     bool
-	KeyType  string
+
+	// IsCA will create a CA certificate that can be used to sign other certificates.
+	IsCA bool
+
+	// KeyType is the type of private/public key pair to create. Supported keytypes
+	// are:
+	//   rsa-2048, rsa-3072, rsa-4096
+	//   ecdsa-224, ecdsa-256, ecdsa-384, ecdsa-521
+	//   ed25519
+	KeyType string
 }
 
+// KeyAndCert represents a bundle of private, public keys and an associated Certificate
 type KeyAndCert struct {
 	Certificate *x509.Certificate
 	PrivateKey  crypto.PrivateKey
 	PublicKey   crypto.PublicKey
 }
 
+// NewCert creates a new keypair and certificate from a Request object. If parent is
+// nil it will be a self-signed certificate, otherwise it will be signed by the private
+// key and certificate in the parent object.
 func NewCert(parent *KeyAndCert, req Request) (*KeyAndCert, error) {
-	keytype := DefaultKeyType
-	if req.KeyType != "" {
-		keytype = req.KeyType
+	if req.KeyType == "" {
+		req.KeyType = DefaultKeyType
 	}
-	priv, err := GenerateKey(keytype)
+	priv, err := GenerateKey(req.KeyType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate key: %v", err)
 	}
@@ -69,6 +95,11 @@ func NewCert(parent *KeyAndCert, req Request) (*KeyAndCert, error) {
 		notAfter = time.Now().Add(DefaultDuration)
 	}
 
+	keyUsage := x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature
+	if req.IsCA {
+		keyUsage = x509.KeyUsageCertSign
+	}
+
 	self := &x509.Certificate{
 		SerialNumber: serial,
 		Subject: pkix.Name{
@@ -81,7 +112,7 @@ func NewCert(parent *KeyAndCert, req Request) (*KeyAndCert, error) {
 		NotBefore: notBefore,
 		NotAfter:  notAfter,
 
-		KeyUsage: x509.KeyUsageCertSign,
+		KeyUsage: keyUsage,
 
 		BasicConstraintsValid: true,
 		IsCA:                  req.IsCA,
@@ -89,15 +120,19 @@ func NewCert(parent *KeyAndCert, req Request) (*KeyAndCert, error) {
 	}
 
 	// Add SANs. Supported types: IPaddr, email, URIs, DNSnames
-	for _, h := range req.SANs {
-		if ip := net.ParseIP(h); ip != nil {
-			self.IPAddresses = append(self.IPAddresses, ip)
-		} else if email, err := mail.ParseAddress(h); err == nil && email.Address == h {
-			self.EmailAddresses = append(self.EmailAddresses, h)
-		} else if uriName, err := url.Parse(h); err == nil && uriName.Scheme != "" && uriName.Host != "" {
-			self.URIs = append(self.URIs, uriName)
-		} else {
-			self.DNSNames = append(self.DNSNames, h)
+	addSans(self, req.SANs)
+
+	// for non-CA certs add the common name to the list of SANs since modern browsers
+	// are phasing out common name.
+	// TODO: fix this for the case of non-DNSName in CN such as email addr.
+	if len(self.DNSNames) == 0 && !req.IsCA {
+		self.DNSNames = append(self.DNSNames, req.CN)
+	}
+
+	if !req.IsCA {
+		self.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth}
+		if len(self.EmailAddresses) > 0 {
+			self.ExtKeyUsage = append(self.ExtKeyUsage, x509.ExtKeyUsageCodeSigning, x509.ExtKeyUsageEmailProtection)
 		}
 	}
 
@@ -130,13 +165,27 @@ func NewCert(parent *KeyAndCert, req Request) (*KeyAndCert, error) {
 	return bundle, nil
 }
 
-// func NewCertFromX509Template(parent *KeyAndCert, private *crypto.PrivateKey templ *x509.Certificate) (*KeyAndCert, error) {
-func NewCertFromX509Template(parent *KeyAndCert, templ *x509.Certificate) (*KeyAndCert, error) {
-	priv, err := GenerateKey(DefaultKeyType)
+// NewCertFromX509Template creates a new keypair and certificate from an X509.Certificate template.
+// If parent is nil, it will be self-signed, otherwise it will be signed by the private key
+// and cert from the parent.
+func NewCertFromX509Template(parent *KeyAndCert, keyType string, templ *x509.Certificate) (*KeyAndCert, error) {
+	if keyType == "" {
+		keyType = DefaultKeyType
+	}
+	priv, err := GenerateKey(keyType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate key: %v", err)
 	}
 	pub := priv.(crypto.Signer).Public()
+
+	// generate a random serial number if the template did not provide one. Go won't sign a cert without a serial
+	if templ.SerialNumber == nil {
+		serial, err := randomSerialNumber()
+		if err != nil {
+			return nil, err
+		}
+		templ.SerialNumber = serial
+	}
 
 	// if parent is nil, this will be a self signed cert
 	signerCert := templ
@@ -167,30 +216,10 @@ func NewCertFromX509Template(parent *KeyAndCert, templ *x509.Certificate) (*KeyA
 	return bundle, nil
 }
 
-// func signKeyAndCert(templ *x509.Certificate, signerCert *x509.Certificate, pub crypto.PublicKey, signerKey crypto.PrivateKey) (*KeyAndCert, error) {
-// 	certDER, err := x509.CreateCertificate(rand.Reader, templ, signerCert, pub, signerKey)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to sign cert: %v", err)
-// 	}
-
-// 	cert, err := x509.ParseCertificate(certDER)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to parse generated cert: %v", err)
-// 	}
-
-// 	bundle := &KeyAndCert{
-// 		Certificate: cert,
-// 		PrivateKey:  priv,
-// 		PublicKey:   pub,
-// 	}
-// 	return bundle, nil
-
-// }
-
 // GenerateKey generates a private/public key pair. Valid keytypes are:
-// rsa-2048, rsa-3072, rsa-4096
-// ecdsa-224, ecdsa-256, ecdsa-384, ecdsa-521
-// ed25519
+//   rsa-2048, rsa-3072, rsa-4096
+//   ecdsa-224, ecdsa-256, ecdsa-384, ecdsa-521
+//   ed25519
 func GenerateKey(keyType string) (crypto.PrivateKey, error) {
 	switch keyType {
 	case "rsa-2048":
@@ -214,6 +243,7 @@ func GenerateKey(keyType string) (crypto.PrivateKey, error) {
 	return nil, fmt.Errorf("unknown keyType %s", keyType)
 }
 
+// Export saves a private key and certficate from a KeyAndCert to keyFile and certFile.
 func Export(keyFile, certFile string, cert *KeyAndCert) error {
 	if err := ExportPrivateKey(keyFile, cert.PrivateKey); err != nil {
 		return err
@@ -224,6 +254,7 @@ func Export(keyFile, certFile string, cert *KeyAndCert) error {
 	return nil
 }
 
+// ExportPrivateKey saves a private key in PEM format from a KeyAndCert to file.
 func ExportPrivateKey(file string, priv crypto.PrivateKey) error {
 	derBytes, err := x509.MarshalPKCS8PrivateKey(priv)
 	if err != nil {
@@ -235,6 +266,7 @@ func ExportPrivateKey(file string, priv crypto.PrivateKey) error {
 		0600)
 }
 
+// ExportPublicKey saves a public key in PEM format from a KeyAndCert to file.
 func ExportPublicKey(file string, pub crypto.PublicKey) error {
 	derBytes, err := x509.MarshalPKIXPublicKey(pub)
 	if err != nil {
@@ -246,15 +278,90 @@ func ExportPublicKey(file string, pub crypto.PublicKey) error {
 		0600)
 }
 
+// ExportCert saves a certificate in PEM format from a KeyAndCert to file.
 func ExportCert(file string, cert *x509.Certificate) error {
-	err := ioutil.WriteFile(
+	return ioutil.WriteFile(
 		file,
 		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}),
 		0600)
+}
+
+// LoadKeyAndCert loads and parses a private key and certificate from keyFile and
+// certFile and returns a KeyAndCert.
+func LoadKeyAndCert(keyFile string, certFile string) (*KeyAndCert, error) {
+	key, err := LoadKey(keyFile)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	cert, err := LoadCert(certFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return &KeyAndCert{
+		Certificate: cert,
+		PrivateKey:  key,
+		PublicKey:   key.(crypto.Signer).Public(),
+	}, nil
+}
+
+// LoadCert loads and parses a certificate from file and returns a *x509.Certificate.
+func LoadCert(file string) (*x509.Certificate, error) {
+	pemBytes, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	der, _ := pem.Decode(pemBytes)
+	if der == nil {
+		return nil, fmt.Errorf("failed to parse certificate: %s", file)
+	}
+	return x509.ParseCertificate(der.Bytes)
+}
+
+// LoadKey loads and parses a private key from file and returns a crypto.PrivateKey.
+func LoadKey(file string) (crypto.PrivateKey, error) {
+	pemBytes, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	der, _ := pem.Decode(pemBytes)
+	if der == nil {
+		return nil, fmt.Errorf("failed to parse key: %s", file)
+	}
+
+	if key, err := x509.ParsePKCS1PrivateKey(der.Bytes); err == nil {
+		return key, nil
+	}
+	if key, err := x509.ParsePKCS8PrivateKey(der.Bytes); err == nil {
+		switch key := key.(type) {
+		case *rsa.PrivateKey, *ecdsa.PrivateKey:
+			return key, nil
+		case ed25519.PrivateKey:
+			return key, nil
+		default:
+			return nil, fmt.Errorf("Found unknown private key type in PKCS#8 wrapping")
+		}
+	}
+	if key, err := x509.ParseECPrivateKey(der.Bytes); err == nil {
+		return key, nil
+	}
+	return nil, fmt.Errorf("Failed to parse private key")
+}
+
+// addSans parses a slice of SANs and adds them to the cert.
+// Supported types: IPaddr, email, URIs, DNSnames
+func addSans(cert *x509.Certificate, sans []string) {
+	for _, h := range sans {
+		if ip := net.ParseIP(h); ip != nil {
+			cert.IPAddresses = append(cert.IPAddresses, ip)
+		} else if email, err := mail.ParseAddress(h); err == nil && email.Address == h {
+			cert.EmailAddresses = append(cert.EmailAddresses, h)
+		} else if uriName, err := url.Parse(h); err == nil && uriName.Scheme != "" && uriName.Host != "" {
+			cert.URIs = append(cert.URIs, uriName)
+		} else {
+			cert.DNSNames = append(cert.DNSNames, h)
+		}
+	}
 }
 
 func subjectKeyId(pub crypto.PublicKey) ([20]byte, error) {
