@@ -7,54 +7,17 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"io/ioutil"
 	"math/big"
 	"net/url"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/joemiller/certin"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
-
-func TestFooTODOPlayground(t *testing.T) {
-	// root, err := certin.NewCert(nil, "root", true, "rsa-3072")
-	root, err := certin.NewCert(nil,
-		certin.Request{CN: "root",
-			IsCA:    true,
-			KeyType: "rsa-3072",
-		},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log("root issuer: ", root.Certificate.Issuer)
-	t.Log("root subject: ", root.Certificate.Subject)
-	t.Log("root isCA: ", root.Certificate.IsCA)
-
-	// interm, err := certin.NewCert(root, "intermediate", true, "ecdsa-256")
-	interm, err := certin.NewCert(root, certin.Request{CN: "intermediate", IsCA: true, KeyType: "ecdsa-256"})
-	require.NoError(t, err)
-	t.Log("intm issuer: ", interm.Certificate.Issuer)
-	t.Log("intm subject: ", interm.Certificate.Subject)
-	t.Log("intm isCA: ", interm.Certificate.IsCA)
-
-	if err := certin.Export("root.key", "root.crt", root); err != nil {
-		require.NoError(t, err)
-	}
-
-	// leaf, err := certin.NewCert(interm, "www.example.com", false, "ed25519")
-	leaf, err := certin.NewCert(interm, certin.Request{CN: "example.com", KeyType: "ed25519"})
-	require.NoError(t, err)
-	t.Log("leaf issuer: ", leaf.Certificate.Issuer)
-	t.Log("leaf subject: ", leaf.Certificate.Subject)
-	t.Log("leaf isCA: ", leaf.Certificate.IsCA)
-
-	if err := certin.Export("leaf.key", "leaf.crt", leaf); err != nil {
-		t.Fatal(err)
-	}
-	// spew.Dump(root)
-}
 
 func TestNewCert_RootCA(t *testing.T) {
 	req := certin.Request{
@@ -71,7 +34,6 @@ func TestNewCert_RootCA(t *testing.T) {
 	assert.Equal(t, true, cert.Certificate.BasicConstraintsValid)
 	assert.Equal(t, true, cert.Certificate.IsCA)
 	assert.Equal(t, true, cert.Certificate.MaxPathLenZero)
-	// TODO: check expiration, subjectKeyId
 
 	// verify key
 	assert.IsType(t, &rsa.PrivateKey{}, cert.PrivateKey)
@@ -92,11 +54,62 @@ func TestNewCert_Root_and_Intermediate(t *testing.T) {
 	assert.Equal(t, "root", interm.Certificate.Issuer.CommonName)
 }
 
+func TestNewCert_Root_Intermediate_and_Leaf(t *testing.T) {
+	root, err := certin.NewCert(nil, certin.Request{CN: "root", IsCA: true})
+	assert.Nil(t, err)
+
+	interm, err := certin.NewCert(root, certin.Request{CN: "intermediate", IsCA: true})
+	assert.Nil(t, err)
+
+	leaf, err := certin.NewCert(interm, certin.Request{CN: "example.com"})
+	assert.Nil(t, err)
+
+	assert.Equal(t, "root", root.Certificate.Subject.CommonName)
+	assert.Equal(t, "root", root.Certificate.Issuer.CommonName)
+
+	assert.Equal(t, "intermediate", interm.Certificate.Subject.CommonName)
+	assert.Equal(t, "root", interm.Certificate.Issuer.CommonName)
+
+	assert.Equal(t, "example.com", leaf.Certificate.Subject.CommonName)
+	assert.Equal(t, "intermediate", leaf.Certificate.Issuer.CommonName)
+	assert.Contains(t, leaf.Certificate.DNSNames, "example.com")
+}
+
+func TestKeyUsage(t *testing.T) {
+	root, err := certin.NewCert(nil, certin.Request{CN: "root", IsCA: true})
+	assert.Nil(t, err)
+
+	leaf, err := certin.NewCert(root, certin.Request{CN: "example.com"})
+	assert.Nil(t, err)
+
+	// CA certs should have the Cert Signing Key usage
+	assert.Equal(t, x509.KeyUsageCertSign, root.Certificate.KeyUsage)
+
+	// leaf certs should have encrypt and sign usages
+	assert.Equal(t, x509.KeyUsageKeyEncipherment|x509.KeyUsageDigitalSignature, leaf.Certificate.KeyUsage)
+}
+
+func TestExtKeyUsage(t *testing.T) {
+	root, err := certin.NewCert(nil, certin.Request{CN: "root", IsCA: true})
+	assert.Nil(t, err)
+
+	sans := []string{"email@example.com"}
+	leaf, err := certin.NewCert(root, certin.Request{CN: "example.com", SANs: sans})
+	assert.Nil(t, err)
+
+	assert.Empty(t, root.Certificate.ExtKeyUsage)
+
+	assert.Contains(t, leaf.Certificate.ExtKeyUsage, x509.ExtKeyUsageClientAuth)
+	assert.Contains(t, leaf.Certificate.ExtKeyUsage, x509.ExtKeyUsageServerAuth)
+	assert.Contains(t, leaf.Certificate.ExtKeyUsage, x509.ExtKeyUsageEmailProtection)
+	assert.Contains(t, leaf.Certificate.ExtKeyUsage, x509.ExtKeyUsageCodeSigning)
+}
+
 func TestNewCert_SANs(t *testing.T) {
 	req := certin.Request{
 		CN: "example.com",
 		SANs: []string{
-			"example.com", // DNSname
+			"example.com", // DNSnames
 			"www.example.com",
 			"127.0.0.1", // IPAddrs
 			"2001::db8:1",
@@ -142,7 +155,7 @@ func TestNewCertFromX509Template_RootCA(t *testing.T) {
 		IsCA:                  true,
 		MaxPathLenZero:        true,
 	}
-	cert, err := certin.NewCertFromX509Template(nil, templ)
+	cert, err := certin.NewCertFromX509Template(nil, "rsa-2048", templ)
 	assert.Nil(t, err)
 
 	// verify cert attributes
@@ -283,4 +296,39 @@ func TestGenerateKey_ed25519(t *testing.T) {
 	}
 }
 
-// TODO: test Export() (save then read keys/certs)
+func TestExportAndLoad(t *testing.T) {
+	// TODO: go 1.15+, replace with the new TB.TempDir()
+	tempDir, cleanup := tempDir(t)
+	defer cleanup()
+
+	algos := []string{"rsa-2048", "ecdsa-256", "ed25519"}
+
+	for _, algo := range algos {
+		t.Log(algo)
+		keyFile := filepath.Join(tempDir, "test.key")
+		certFile := filepath.Join(tempDir, "test.crt")
+
+		cert, err := certin.NewCert(nil, certin.Request{KeyType: algo})
+		assert.NoError(t, err)
+
+		err = certin.Export(keyFile, certFile, cert)
+		assert.NoError(t, err)
+
+		loadedCert, err := certin.LoadKeyAndCert(keyFile, certFile)
+		assert.NoError(t, err)
+		assert.Equal(t, cert, loadedCert, "generated cert and cert loaded from disk are not equal")
+	}
+}
+
+func tempDir(t *testing.T) (string, func()) {
+	tempDir, err := ioutil.TempDir("", t.Name())
+	if err != nil {
+		t.Fatalf("TempDir: %v", err)
+	}
+	cleanup := func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Errorf("TempDir RemoveAll cleanup: %v", err)
+		}
+	}
+	return tempDir, cleanup
+}
