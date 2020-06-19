@@ -71,6 +71,11 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+      - uses: azure/docker-login@v1
+        with:
+          login-server: index.docker.io
+          username: ${{ secrets.DOCKERIO_USERNAME }}
+          password: ${{ secrets.DOCKERIO_TOKEN }}
 
       - name: Unshallow
         run: |
