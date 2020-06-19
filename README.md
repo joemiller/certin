@@ -2,19 +2,25 @@ certin
 =======
 
 ![test](https://github.com/joemiller/certin/workflows/test/badge.svg)
+TODO: godoc badge
 
-TODO .. document
+Certin provides a library and CLI for quickly creating keys and certificates for use
+as test fixtures.
 
-TODO .. license. mit probably
+It is available as both a Go library for use in Go tests as well as a CLI for
+creating fixtures as files for Go or any other language.
 
-------------------------------------------------------------------------------
+Go Library
+----------
 
-NOTES
-====
+```
+go get -u github.com/joemiller/certin
+```
 
 Example uses:
 
 ```go
+// See certin.go or the godoc page for details on each struct member
 type Request struct {
 	CN       string
 	O        []string
@@ -53,11 +59,89 @@ root, err := NewCert(nil, Request{CN: "root", IsCA: true})
 interm, err := NewCert(root, Request{CN: " intermediate", IsCA: true})
 ```
 
-* Create cert from `x509.Certificate` template instead of `certin.Request`. This allows for more
+* Create cert from `x509.Certificate` template instead of `certin.Request`. This allows for full
   control over the contents of the cert.
 
 ```go
-root, err := NewCert(nil, Request{CN: "yubico root", IsCA: true})
-interm, err := NewCert(root, Request{CN: "yubikey attestation intermediate", IsCA: true})
-yubikeyAttestationCert, err := NewCertFromX509Template(interm, *x509.Certificate{.... all the details in a yubikey attestation cert ...})
+root, err := NewCert(nil, Request{CN: "root CA", IsCA: true})
+interm, err := NewCert(root, Request{CN: "intermediate", IsCA: true})
+
+templ := &x509.Certificate{
+  SerialNumber: big.NewInt(123456789),
+  Subject: pkix.Name{
+    Organization:       []string{"My Org"},
+    OrganizationalUnit: []string{"My dept"},
+    CommonName:         "example.com",
+  },
+  DNSNames: []string{"example.com"}
+
+  NotBefore: time.Now(),
+  NotAfter:  time.Now().Add(10 * time.Minute),
+	KeyUsage: x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature
+}
+cert, err := certin.NewCertFromX509Template(interm, "ecdsa-256", templ)
+```
+
+certin CLI
+----------
+
+TODO: install
+
+Examples:
+
+```console
+$ certin create KEY CERT \
+    [--signer-key=CA.key] \      # if not set, CERT will be self-signed
+    [--signer-cert=CA.crt] \     # ""
+    [--cn=COMMON-NAME] \
+    [--o=ORG] \
+    [--ou=ORG-UNIT] \
+    [--duration=8760h]           # certificate duration (TTL, expiration). default 1yr
+    [--is-ca=false]              # create a new CA (cert will have CA:TRUE). If --signer-key/cert is set this will be an intermediate cert
+    [--sans=SANS]                # comma-separated list of SubjectAltNames. DNS, IP, Email, URL, and URI supported
+    [--key-type=rsa-2048]        # type and size of KEY to create
+```
+
+* simple self-signed cert:
+
+```console
+certin create self-signed.key self-signed.crt
+```
+
+* root CA:
+
+```console
+certin create root.key root.crt --is-ca=true
+```
+
+* intermediate CA:
+
+```console
+certin create intermediate.key intermediate.crt \
+  --signer-key=root.key \
+  --signer-crt=root.crt \
+  --is-ca=true
+```
+
+* leaf cert:
+
+```console
+certin create example.key example.crt \
+  --signer-key=intermediate.key \
+  --signer-crt=intermediate.crt \
+  --cn="example.com" \
+  --key-type="ecdsa-256"
+```
+
+TODO
+----
+
+support CSRs:
+
+```go
+cert, err := NewCertFromCSR(root, "rsa-2048", x509.CertificateRequest{})
+```
+
+```console
+certin sign ...
 ```
