@@ -1,8 +1,8 @@
 certin
 =======
 
-![main](https://github.com/joemiller/certin/workflows/main/badge.svg)
-TODO: godoc badge
+![ci-cd](https://github.com/joemiller/certin/workflows/main/badge.svg)
+[![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat)](http://godoc.org/github.com/joemiller/certin)
 
 Certin is a Go library and CLI for quickly creating keys and certificates for use
 as test fixtures.
