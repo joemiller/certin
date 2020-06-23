@@ -85,7 +85,11 @@ cert, err := certin.NewCertFromX509Template(interm, "ecdsa-256", templ)
 certin CLI
 ----------
 
-TODO: install
+### Install
+
+* macOS homebrew (Linuxbrew might work too): `brew install joemiller/taps/certin`
+* Binaries for all platforms (macOS, Linux, *BSD) on [GitHub Releases](https://github.com/joemiller/certin/releases)
+* [Docker images](https://github.com/joemiller/certin) are also available.
 
 Examples:
 
