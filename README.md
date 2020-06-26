@@ -54,18 +54,22 @@ root, err := certin.NewCert(nil, certin.Request{CN: "root CA", IsCA: true}))
 * root and intermediate CA certs:
 
 ```go
-root, err := NewCert(nil, Request{CN: "root", IsCA: true})
+root, err := certin.NewCert(nil, Request{CN: "root", IsCA: true})
 // pass the root key/cert to NewCert() to sign the intermediate cert
-interm, err := NewCert(root, Request{CN: " intermediate", IsCA: true})
+interm, err := certin.NewCert(root, Request{CN: " intermediate", IsCA: true})
 ```
 
-* Create cert from `x509.Certificate` template instead of `certin.Request`. This allows for full
+* leaf certificate signed by intermediate:
+
+```go
+leaf, err := certin.NewCert(interm, Request{CN: "example.com", SANs: []string{"example.com", "www.example.com"}})
+```
+
+If you need more control over the contents of the certificate you can create a cert
+from a `x509.Certificate` template instead of `certin.Request`. This allows for full
   control over the contents of the cert.
 
 ```go
-root, err := NewCert(nil, Request{CN: "root CA", IsCA: true})
-interm, err := NewCert(root, Request{CN: "intermediate", IsCA: true})
-
 templ := &x509.Certificate{
   SerialNumber: big.NewInt(123456789),
   Subject: pkix.Name{
