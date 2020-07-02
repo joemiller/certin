@@ -93,7 +93,7 @@ certin CLI
 
 * macOS homebrew (Linuxbrew might work too): `brew install joemiller/taps/certin`
 * Binaries for all platforms (macOS, Linux, *BSD) on [GitHub Releases](https://github.com/joemiller/certin/releases)
-* [Docker images](https://github.com/joemiller/certin) are also available.
+* [Docker images](https://hub.docker.com/r/joemiller/certin) are also available.
 
 Examples:
 
