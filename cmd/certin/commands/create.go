@@ -39,7 +39,7 @@ func init() {
 	createCmd.Flags().StringSlice("ou", []string{}, "organizational unit")
 	createCmd.Flags().Duration("duration", 365*24*time.Hour, "certificate duration")
 	createCmd.Flags().Bool("is-ca", false, "create a CA cert capable of signing other certs")
-	createCmd.Flags().String("key-type", "rsa-2048", "key type to create")
+	createCmd.Flags().String("key-type", "rsa-2048", "key type to create (rsa-2048, rsa-3072, rsa-4096, ecdsa-256, ecdsa-384, ecdsa-512, ed25519)")
 	createCmd.Flags().StringSlice("sans", []string{}, "SubjectAltNames")
 
 	rootCmd.AddCommand(createCmd)
