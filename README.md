@@ -145,6 +145,24 @@ templ := &x509.Certificate{
 cert, err := certin.NewCertFromX509Template(interm, "ecdsa-256", templ)
 ```
 
+Motivation
+----------
+
+I've worked on lots of projects that involved TLS certs and found myself constantly
+needing to create certificate hiearchies for test fixtures. There are plenty of great
+tools that can accomplish this. After experimenting with a few of them I decided I
+wanted something simpler and built specifically for the simplest test cases.
+
+- `openssl`: Plenty capable of being scripted to create root and intermediate CAs and
+  sign certs. However you usually end up with some mixture of openssl.cnf file to
+  express certain options in combination with command line flags.
+- `cfssl`: Very flexible, easy to install and use. Most config is done through JSON
+  files.
+
+I felt like the common cases for certs needed during testing should be generatable
+with a simple CLI and only a few command flags and common defaults, no config files or
+complex scripts.
+
 TODO
 ----
 
