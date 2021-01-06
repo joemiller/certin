@@ -4,7 +4,6 @@ import (
 	"errors"
 	"io/ioutil"
 	"os"
-	"time"
 
 	"github.com/joemiller/certin"
 	"github.com/spf13/cobra"
@@ -25,7 +24,7 @@ certin create root.key root.crt --is-ca=true --cn="root CA"
 # create intermediate CA, signed by root.key/crt
 certin create intermediate.key intermediate.crt --signer-key root.key --signer-cert root.crt --is-ca=true --cn="intermediate CA"
 
-# create leaf certificate with SubjectAltNames
+# create leaf certificate with SubjectAltNames (SANs)
 certin create example.key example.crt --signer-key intermediate.key --signer-cert intermediate.crt --cn="example.com" --sans="example.com,www.example.com"
 `),
 	Args: cobra.ExactArgs(2),
@@ -34,15 +33,15 @@ certin create example.key example.crt --signer-key intermediate.key --signer-cer
 }
 
 func init() {
-	createCmd.Flags().String("signer-key", "", "CA key to sign the CERT with. If omitted, a self-signed cert is generated.")
-	createCmd.Flags().String("signer-cert", "", "CA cert to sign the CERT with. If omitted, a self-signed cert is generated.")
-	createCmd.Flags().String("cn", "", "common name")
-	createCmd.Flags().StringSlice("o", []string{}, "organization")
-	createCmd.Flags().StringSlice("ou", []string{}, "organizational unit")
-	createCmd.Flags().Duration("duration", 365*24*time.Hour, "certificate duration")
+	createCmd.Flags().StringP("signer-key", "k", "", "CA key to sign the CERT with. If omitted, a self-signed cert is generated.")
+	createCmd.Flags().StringP("signer-cert", "c", "", "CA cert to sign the CERT with. If omitted, a self-signed cert is generated.")
+	createCmd.Flags().String("cn", "", "Certificate common name")
+	createCmd.Flags().StringSlice("o", []string{}, "Certificate organization")
+	createCmd.Flags().StringSlice("ou", []string{}, "Certificate organizational unit")
+	createCmd.Flags().StringP("duration", "d", "1y", "certificate duration. Examples of valid values: 1w, 1d, 2d3h5m, 1h30m, 10s")
 	createCmd.Flags().Bool("is-ca", false, "create a CA cert capable of signing other certs")
-	createCmd.Flags().String("key-type", "rsa-2048", "key type to create (rsa-2048, rsa-3072, rsa-4096, ecdsa-256, ecdsa-384, ecdsa-512, ed25519)")
-	createCmd.Flags().StringSlice("sans", []string{}, "SubjectAltNames")
+	createCmd.Flags().StringP("key-type", "K", "rsa-2048", "key type to create (rsa-2048, rsa-3072, rsa-4096, ecdsa-256, ecdsa-384, ecdsa-512, ed25519)")
+	createCmd.Flags().StringSlice("sans", []string{}, "Certificate SubjectAltNames, comma separated")
 	createCmd.Flags().String("bundle", "", "(optional) Create combined bundle FILE containing private-key, certificate, and signing CA cert")
 
 	rootCmd.AddCommand(createCmd)
@@ -73,7 +72,7 @@ func createKeyAndCert(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	duration, err := cmd.Flags().GetDuration("duration")
+	durationStr, err := cmd.Flags().GetString("duration")
 	if err != nil {
 		return err
 	}
@@ -103,6 +102,11 @@ func createKeyAndCert(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	duration, err := ParseDuration(durationStr)
+	if err != nil {
+		return err
 	}
 
 	req := certin.Request{

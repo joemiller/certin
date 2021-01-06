@@ -22,23 +22,27 @@ Available options:
 * Binaries for all platforms (macOS, Linux, *BSD) on [GitHub Releases](https://github.com/joemiller/certin/releases)
 * [Docker images](https://hub.docker.com/r/joemiller/certin)
 
-Examples:
+Usage:
 
 ```console
-$ certin create KEY CERT \
-    [--bundle=tls.pem] \         # (optional) Create combined bundle FILE containing private-key, certificate, and signing CA cert
-    [--signer-key=CA.key] \      # if not set, CERT will be self-signed
-    [--signer-cert=CA.crt] \     # ""
-    [--cn=COMMON-NAME] \
-    [--o=ORG] \
-    [--ou=ORG-UNIT] \
-    [--duration=8760h]           # certificate duration (TTL, expiration). default 1yr
-    [--is-ca=false]              # create a new CA (cert will have CA:TRUE). If --signer-key/cert is set this will be an intermediate cert
-    [--sans=SANS]                # comma-separated list of SubjectAltNames. DNS, IP, Email, URL, and URI supported
-    [--key-type=rsa-2048]        # type and size of KEY to create
+$ certin create KEY CERT
+Flags:
+      --bundle string        (optional) Create combined bundle FILE containing private-key, certificate, and signing CA cert
+      --cn string            common name
+  -d, --duration string      certificate duration. Examples of valid values: 1w, 1d, 2d3h5m, 1h30m, 10s (default "1y")
+  -h, --help                 help for create
+      --is-ca                create a CA cert capable of signing other certs
+  -K, --key-type string      key type to create (rsa-2048, rsa-3072, rsa-4096, ecdsa-256, ecdsa-384, ecdsa-512, ed25519) (default "rsa-2048")
+      --o strings            organization
+      --ou strings           organizational unit
+      --sans strings         SubjectAltNames, comma separated
+  -c, --signer-cert string   CA cert to sign the CERT with. If omitted, a self-signed cert is generated.
+  -k, --signer-key string    CA key to sign the CERT with. If omitted, a self-signed cert is generated.
 ```
 
-* simple self-signed cert:
+Examples:
+
+* self-signed cert:
 
 ```console
 certin create self-signed.key self-signed.crt
@@ -54,19 +58,19 @@ certin create root.key root.crt --is-ca=true
 
 ```console
 certin create intermediate.key intermediate.crt \
-  --signer-key=root.key \
-  --signer-crt=root.crt \
-  --is-ca=true
+  --signer-key root.key \
+  --signer-crt root.crt \
+  --is-ca
 ```
 
-* leaf cert:
+* leaf cert with SubjectAltNames (SANs):
 
 ```console
 certin create example.key example.crt \
-  --signer-key=intermediate.key \
-  --signer-crt=intermediate.crt \
-  --cn="example.com" \
-  --key-type="ecdsa-256"
+  --signer-key intermediate.key \
+  --signer-crt intermediate.crt \
+  --cn "example.com,www.example.com" \
+  --key-type "ecdsa-256"
 ```
 
 Go Library
