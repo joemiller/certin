@@ -2,6 +2,8 @@ package commands
 
 import (
 	"errors"
+	"io/ioutil"
+	"os"
 	"time"
 
 	"github.com/joemiller/certin"
@@ -41,6 +43,7 @@ func init() {
 	createCmd.Flags().Bool("is-ca", false, "create a CA cert capable of signing other certs")
 	createCmd.Flags().String("key-type", "rsa-2048", "key type to create (rsa-2048, rsa-3072, rsa-4096, ecdsa-256, ecdsa-384, ecdsa-512, ed25519)")
 	createCmd.Flags().StringSlice("sans", []string{}, "SubjectAltNames")
+	createCmd.Flags().String("bundle", "", "(optional) Create combined bundle FILE containing private-key, certificate, and signing CA cert")
 
 	rootCmd.AddCommand(createCmd)
 }
@@ -86,6 +89,10 @@ func createKeyAndCert(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	bundle, err := cmd.Flags().GetString("bundle")
+	if err != nil {
+		return err
+	}
 
 	var signer *certin.KeyAndCert
 	if signerKeyFile != "" || signerCertFile != "" {
@@ -118,6 +125,34 @@ func createKeyAndCert(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if bundle != "" {
+		err := fileConcat(bundle, keyFile, certFile, signerCertFile)
+		if err != nil {
+			return err
+		}
+		cmd.Printf("Success! Wrote: %s, %s, %s\n", keyFile, certFile, bundle)
+		return nil
+	}
+
 	cmd.Printf("Success! Wrote: %s, %s\n", keyFile, certFile)
+	return nil
+}
+
+func fileConcat(out string, in ...string) error {
+	f, err := os.Create(out)
+	if err != nil {
+		return err
+	}
+
+	for _, i := range in {
+		b, err := ioutil.ReadFile(i)
+		if err != nil {
+			return err
+		}
+		_, err = f.Write(b)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }

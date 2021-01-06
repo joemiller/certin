@@ -26,6 +26,7 @@ Examples:
 
 ```console
 $ certin create KEY CERT \
+    [--bundle=tls.pem] \         # (optional) Create combined bundle FILE containing private-key, certificate, and signing CA cert
     [--signer-key=CA.key] \      # if not set, CERT will be self-signed
     [--signer-cert=CA.crt] \     # ""
     [--cn=COMMON-NAME] \
