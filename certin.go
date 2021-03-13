@@ -79,7 +79,7 @@ func NewCert(parent *KeyAndCert, req Request) (*KeyAndCert, error) {
 	}
 	pub := priv.(crypto.Signer).Public()
 
-	skid, err := subjectKeyId(pub)
+	skid, err := hashKeyId(pub)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func NewCert(parent *KeyAndCert, req Request) (*KeyAndCert, error) {
 			OrganizationalUnit: req.OU,
 			CommonName:         req.CN,
 		},
-		SubjectKeyId: skid[:],
+		SubjectKeyId: skid,
 
 		NotBefore: notBefore,
 		NotAfter:  notAfter,
@@ -137,13 +137,17 @@ func NewCert(parent *KeyAndCert, req Request) (*KeyAndCert, error) {
 	}
 
 	// if parent is nil, this will be a self signed cert
+	signerKey := priv
 	signerCert := self
 	if parent != nil {
 		signerCert = parent.Certificate
-	}
-	signerKey := priv
-	if parent != nil {
 		signerKey = parent.PrivateKey
+
+		akid, err := hashKeyId(parent.PublicKey)
+		if err != nil {
+			return nil, err
+		}
+		self.AuthorityKeyId = akid
 	}
 
 	// return signKeyAndCert(self, signerCert, pub, signerKey)
@@ -364,10 +368,10 @@ func addSans(cert *x509.Certificate, sans []string) {
 	}
 }
 
-func subjectKeyId(pub crypto.PublicKey) ([20]byte, error) {
+func hashKeyId(pub crypto.PublicKey) ([]byte, error) {
 	spkiASN1, err := x509.MarshalPKIXPublicKey(pub)
 	if err != nil {
-		return [20]byte{}, fmt.Errorf("failed to marshal public key: %v", err)
+		return []byte{}, fmt.Errorf("failed to marshal public key: %v", err)
 	}
 
 	var spki struct {
@@ -376,11 +380,11 @@ func subjectKeyId(pub crypto.PublicKey) ([20]byte, error) {
 	}
 	_, err = asn1.Unmarshal(spkiASN1, &spki)
 	if err != nil {
-		return [20]byte{}, fmt.Errorf("failed to decode public key: %v", err)
+		return []byte{}, fmt.Errorf("failed to decode public key: %v", err)
 	}
 
 	skid := sha1.Sum(spki.SubjectPublicKey.Bytes)
-	return skid, nil
+	return skid[:], nil
 }
 
 func randomSerialNumber() (*big.Int, error) {
