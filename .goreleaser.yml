@@ -76,7 +76,7 @@ brews:
 dockers:
   # primary docker image for amd64 arch
   - dockerfile: Dockerfile
-    binaries:
+    ids:
       - certin
     goos: linux
     goarch: amd64
@@ -87,7 +87,7 @@ dockers:
       - "joemiller/certin:latest"
   # build a docker image for arm64 arch
   - dockerfile: Dockerfile
-    binaries:
+    ids:
       - certin
     goos: linux
     goarch: arm64
@@ -99,7 +99,7 @@ dockers:
       - "joemiller/certin:latest-arm64"
   # build a docker image for arm
   - dockerfile: Dockerfile
-    binaries:
+    ids:
       - certin
     goos: linux
     goarch: arm
