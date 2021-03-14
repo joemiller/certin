@@ -174,7 +174,7 @@ TODO
 support CSRs:
 
 ```go
-cert, err := NewCertFromCSR(root, "rsa-2048", x509.CertificateRequest{})
+cert, err := NewCertFromCSR(root, crypto.PrivateKey, x509.CertificateRequest{})
 ```
 
 ```console
