@@ -7,10 +7,8 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"io/ioutil"
 	"math/big"
 	"net/url"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -297,9 +295,7 @@ func TestGenerateKey_ed25519(t *testing.T) {
 }
 
 func TestExportAndLoad(t *testing.T) {
-	// TODO: go 1.15+, replace with the new TB.TempDir()
-	tempDir, cleanup := tempDir(t)
-	defer cleanup()
+	tempDir := t.TempDir()
 
 	algos := []string{"rsa-2048", "ecdsa-256", "ed25519"}
 
@@ -318,17 +314,4 @@ func TestExportAndLoad(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, cert, loadedCert, "generated cert and cert loaded from disk are not equal")
 	}
-}
-
-func tempDir(t *testing.T) (string, func()) {
-	tempDir, err := ioutil.TempDir("", t.Name())
-	if err != nil {
-		t.Fatalf("TempDir: %v", err)
-	}
-	cleanup := func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			t.Errorf("TempDir RemoveAll cleanup: %v", err)
-		}
-	}
-	return tempDir, cleanup
 }
