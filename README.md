@@ -69,7 +69,8 @@ certin create intermediate.key intermediate.crt \
 certin create example.key example.crt \
   --signer-key intermediate.key \
   --signer-crt intermediate.crt \
-  --cn "example.com,www.example.com" \
+  --cn example.com \
+  --sans "example.com,www.example.com" \
   --key-type "ecdsa-256"
 ```
 
