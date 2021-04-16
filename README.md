@@ -59,7 +59,7 @@ certin create root.key root.crt --is-ca=true
 ```console
 certin create intermediate.key intermediate.crt \
   --signer-key root.key \
-  --signer-crt root.crt \
+  --signer-cert root.crt \
   --is-ca
 ```
 
@@ -68,7 +68,7 @@ certin create intermediate.key intermediate.crt \
 ```console
 certin create example.key example.crt \
   --signer-key intermediate.key \
-  --signer-crt intermediate.crt \
+  --signer-cert intermediate.crt \
   --cn example.com \
   --sans "example.com,www.example.com" \
   --key-type "ecdsa-256"
