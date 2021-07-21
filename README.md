@@ -113,7 +113,7 @@ root, err := certin.NewCert(nil, certin.Request{CN: "self-signed"}))
 * root CA cert:
 
 ```go
-root, err := certin.NewCert(nil, certin.Request{CN: "root CA", IsCA: true}))
+root, err := certin.NewCert(nil, certin.Request{CN: "root CA", IsCA: true})
 ```
 
 * root and intermediate CA certs:
@@ -160,7 +160,7 @@ tools that can accomplish this. After experimenting with a few of them I decided
 wanted something simpler and built specifically for the simplest test cases.
 
 - `openssl`: Plenty capable of being scripted to create root and intermediate CAs and
-  sign certs. However you usually end up with some mixture of openssl.cnf file to
+  sign certs. However you usually end up with some mixture of openssl.cnf files to
   express certain options in combination with command line flags.
 - `cfssl`: Very flexible, easy to install and use. Most config is done through JSON
   files.
