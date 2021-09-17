@@ -66,6 +66,13 @@ type KeyAndCert struct {
 	PublicKey   crypto.PublicKey
 }
 
+// KeyAndCSR represents a bundle of private, public keys and an associated Certificate Request
+type KeyAndCSR struct {
+	CertificateRequest *x509.CertificateRequest
+	PrivateKey         crypto.PrivateKey
+	PublicKey          crypto.PublicKey
+}
+
 // NewCert creates a new keypair and certificate from a Request object. If parent is
 // nil it will be a self-signed certificate, otherwise it will be signed by the private
 // key and certificate in the parent object.
@@ -120,7 +127,7 @@ func NewCert(parent *KeyAndCert, req Request) (*KeyAndCert, error) {
 	}
 
 	// Add SANs. Supported types: IPaddr, email, URIs, DNSnames
-	addSans(self, req.SANs)
+	appendAltNamesToCertificate(self, req.SANs)
 
 	// for non-CA certs add the common name to the list of SANs since modern browsers
 	// are phasing out common name.
@@ -201,7 +208,6 @@ func NewCertFromX509Template(parent *KeyAndCert, keyType string, templ *x509.Cer
 		signerKey = parent.PrivateKey
 	}
 
-	// return signKeyAndCert(templ, signerCert, pub, signerKey)
 	certDER, err := x509.CreateCertificate(rand.Reader, templ, signerCert, pub, signerKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign cert: %v", err)
@@ -217,6 +223,49 @@ func NewCertFromX509Template(parent *KeyAndCert, keyType string, templ *x509.Cer
 		PrivateKey:  priv,
 		PublicKey:   pub,
 	}
+	return bundle, nil
+}
+
+// NewCSR creates a new keypair and certificate request from a Request object.
+func NewCSR(req Request) (*KeyAndCSR, error) {
+	if req.KeyType == "" {
+		req.KeyType = DefaultKeyType
+	}
+	priv, err := GenerateKey(req.KeyType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate key: %v", err)
+	}
+	pub := priv.(crypto.Signer).Public()
+
+	templ := &x509.CertificateRequest{
+		Subject: pkix.Name{
+			Organization:       req.O,
+			OrganizationalUnit: req.OU,
+			CommonName:         req.CN,
+		},
+		// TODO: fix this for the case of non-DNSName in CN such as email addr.
+		DNSNames: []string{req.CN}, // Copy commonname into the SAN
+	}
+
+	// Add SANs. Supported types: IPaddr, email, URIs, DNSnames
+	appendAltNamesToCertificateRequest(templ, req.SANs)
+
+	csrDER, err := x509.CreateCertificateRequest(rand.Reader, templ, priv)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate certificate signing request: %v", err)
+	}
+
+	csr, err := x509.ParseCertificateRequest(csrDER)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse generated certificate signing request: %v", err)
+	}
+
+	bundle := &KeyAndCSR{
+		CertificateRequest: csr,
+		PrivateKey:         priv,
+		PublicKey:          pub,
+	}
+
 	return bundle, nil
 }
 
@@ -247,12 +296,23 @@ func GenerateKey(keyType string) (crypto.PrivateKey, error) {
 	return nil, fmt.Errorf("unknown keyType %s", keyType)
 }
 
-// Export saves a private key and certficate from a KeyAndCert to keyFile and certFile.
-func Export(keyFile, certFile string, cert *KeyAndCert) error {
+// ExportKeyAndCert saves a private key and certficate from a KeyAndCert to keyFile and certFile.
+func ExportKeyAndCert(keyFile, certFile string, cert *KeyAndCert) error {
 	if err := ExportPrivateKey(keyFile, cert.PrivateKey); err != nil {
 		return err
 	}
 	if err := ExportCert(certFile, cert.Certificate); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ExportKeyAndCSR saves a private key and certficate request from a KeyAndCert to keyFile and csrFile.
+func ExportKeyAndCSR(keyFile, csrFile string, csr *KeyAndCSR) error {
+	if err := ExportPrivateKey(keyFile, csr.PrivateKey); err != nil {
+		return err
+	}
+	if err := ExportCSR(csrFile, csr.CertificateRequest); err != nil {
 		return err
 	}
 	return nil
@@ -290,6 +350,14 @@ func ExportCert(file string, cert *x509.Certificate) error {
 		0600)
 }
 
+// ExportCSR saves a certificate request in PEM format from a KeyAndCSR to file.
+func ExportCSR(file string, csr *x509.CertificateRequest) error {
+	return ioutil.WriteFile(
+		file,
+		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csr.Raw}),
+		0600)
+}
+
 // LoadKeyAndCert loads and parses a private key and certificate from keyFile and
 // certFile and returns a KeyAndCert.
 func LoadKeyAndCert(keyFile string, certFile string) (*KeyAndCert, error) {
@@ -309,7 +377,26 @@ func LoadKeyAndCert(keyFile string, certFile string) (*KeyAndCert, error) {
 	}, nil
 }
 
-// LoadCert loads and parses a certificate from file and returns a *x509.Certificate.
+// LoadKeyAndCSR loads and parses a private key and certificate request from keyFile and
+// csrFile and returns a KeyAndCSR.
+func LoadKeyAndCSR(keyFile, csrFile string) (*KeyAndCSR, error) {
+	key, err := LoadKey(keyFile)
+	if err != nil {
+		return nil, err
+	}
+	csr, err := LoadCSR(csrFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return &KeyAndCSR{
+		CertificateRequest: csr,
+		PrivateKey:         key,
+		PublicKey:          key.(crypto.Signer).Public(),
+	}, nil
+}
+
+// LoadCert loads and parses a certificate from a PEM-formatted file and returns a *x509.Certificate.
 func LoadCert(file string) (*x509.Certificate, error) {
 	pemBytes, err := ioutil.ReadFile(file)
 	if err != nil {
@@ -320,6 +407,19 @@ func LoadCert(file string) (*x509.Certificate, error) {
 		return nil, fmt.Errorf("failed to parse certificate: %s", file)
 	}
 	return x509.ParseCertificate(der.Bytes)
+}
+
+// LoadCSR loads and parses a certificate request from a PEM-formatted file and returns a *x509.Certificate.
+func LoadCSR(file string) (*x509.CertificateRequest, error) {
+	pemBytes, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	der, _ := pem.Decode(pemBytes)
+	if der == nil {
+		return nil, fmt.Errorf("failed to parse certificate request: %s", file)
+	}
+	return x509.ParseCertificateRequest(der.Bytes)
 }
 
 // LoadKey loads and parses a private key from file and returns a crypto.PrivateKey.
@@ -352,9 +452,9 @@ func LoadKey(file string) (crypto.PrivateKey, error) {
 	return nil, fmt.Errorf("Failed to parse private key")
 }
 
-// addSans parses a slice of SANs and adds them to the cert.
+// appendAltNamesToCertificate parses a slice of SANs and append them to a &x509.Certificate
 // Supported types: IPaddr, email, URIs, DNSnames
-func addSans(cert *x509.Certificate, sans []string) {
+func appendAltNamesToCertificate(cert *x509.Certificate, sans []string) {
 	for _, h := range sans {
 		if ip := net.ParseIP(h); ip != nil {
 			cert.IPAddresses = append(cert.IPAddresses, ip)
@@ -364,6 +464,22 @@ func addSans(cert *x509.Certificate, sans []string) {
 			cert.URIs = append(cert.URIs, uriName)
 		} else {
 			cert.DNSNames = append(cert.DNSNames, h)
+		}
+	}
+}
+
+// appendAltNamesToCertificateRequest parses a slice of SANs and append them to an &x509.CertificateRequest.
+// Supported types: IPaddr, email, URIs, DNSnames
+func appendAltNamesToCertificateRequest(csr *x509.CertificateRequest, sans []string) {
+	for _, h := range sans {
+		if ip := net.ParseIP(h); ip != nil {
+			csr.IPAddresses = append(csr.IPAddresses, ip)
+		} else if email, err := mail.ParseAddress(h); err == nil && email.Address == h {
+			csr.EmailAddresses = append(csr.EmailAddresses, h)
+		} else if uriName, err := url.Parse(h); err == nil && uriName.Scheme != "" && uriName.Host != "" {
+			csr.URIs = append(csr.URIs, uriName)
+		} else {
+			csr.DNSNames = append(csr.DNSNames, h)
 		}
 	}
 }

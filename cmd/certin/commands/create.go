@@ -26,10 +26,13 @@ certin create intermediate.key intermediate.crt --signer-key root.key --signer-c
 
 # create leaf certificate with SubjectAltNames (SANs)
 certin create example.key example.crt --signer-key intermediate.key --signer-cert intermediate.crt --cn="example.com" --sans="example.com,www.example.com"
+
+# create a certificate signing request (CSR) instead of a signed certificate
+certin create example.key example.csr --cn example.com
 `),
 	Args: cobra.ExactArgs(2),
 	// SilenceUsage: true,
-	RunE: createKeyAndCert,
+	RunE: create,
 }
 
 func init() {
@@ -43,20 +46,36 @@ func init() {
 	createCmd.Flags().StringP("key-type", "K", "rsa-2048", "key type to create (rsa-2048, rsa-3072, rsa-4096, ecdsa-256, ecdsa-384, ecdsa-512, ed25519)")
 	createCmd.Flags().StringSlice("sans", []string{}, "Certificate SubjectAltNames, comma separated")
 	createCmd.Flags().String("bundle", "", "(optional) Create combined bundle FILE containing private-key, certificate, and signing CA cert")
+	createCmd.Flags().Bool("csr", false, "create a Certificate Signing Request (CSR) instead of a signed certificate")
 
 	rootCmd.AddCommand(createCmd)
 }
 
-func createKeyAndCert(cmd *cobra.Command, args []string) error {
-	// these are guaranteed to exist by the ExactArgs(2) in the Command
-	keyFile := args[0]
-	certFile := args[1]
-
-	signerKeyFile, err := cmd.Flags().GetString("signer-key")
+func create(cmd *cobra.Command, args []string) error {
+	csr, err := cmd.Flags().GetBool("csr")
 	if err != nil {
 		return err
 	}
-	signerCertFile, err := cmd.Flags().GetString("signer-cert")
+
+	// if --csr=true, generate key + CSR
+	if csr {
+		return createKeyAndCSR(cmd, args)
+	}
+
+	// else, generate key + signed cert
+	return createKeyAndCert(cmd, args)
+}
+
+func createKeyAndCert(cmd *cobra.Command, args []string) error {
+	// these are guaranteed to exist by the ExactArgs(2) in the Command
+	keyOut := args[0]
+	certOut := args[1]
+
+	signerKey, err := cmd.Flags().GetString("signer-key")
+	if err != nil {
+		return err
+	}
+	signerCert, err := cmd.Flags().GetString("signer-cert")
 	if err != nil {
 		return err
 	}
@@ -94,11 +113,11 @@ func createKeyAndCert(cmd *cobra.Command, args []string) error {
 	}
 
 	var signer *certin.KeyAndCert
-	if signerKeyFile != "" || signerCertFile != "" {
-		if signerKeyFile == "" || signerCertFile == "" {
+	if signerKey != "" || signerCert != "" {
+		if signerKey == "" || signerCert == "" {
 			return errors.New("must specify both --signer-cert and --signer-key")
 		}
-		signer, err = certin.LoadKeyAndCert(signerKeyFile, signerCertFile)
+		signer, err = certin.LoadKeyAndCert(signerKey, signerCert)
 		if err != nil {
 			return err
 		}
@@ -124,24 +143,97 @@ func createKeyAndCert(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	err = certin.Export(keyFile, certFile, cert)
+	err = certin.ExportKeyAndCert(keyOut, certOut, cert)
 	if err != nil {
 		return err
 	}
 
 	if bundle != "" {
-		err := fileConcat(bundle, keyFile, certFile, signerCertFile)
+		err := fileConcat(bundle, keyOut, certOut, signerCert)
 		if err != nil {
 			return err
 		}
-		cmd.Printf("Success! Wrote: %s, %s, %s\n", keyFile, certFile, bundle)
+		cmd.Printf("Success! Wrote: %s, %s, %s\n", keyOut, certOut, bundle)
 		return nil
 	}
 
-	cmd.Printf("Success! Wrote: %s, %s\n", keyFile, certFile)
+	cmd.Printf("Success! Wrote: %s, %s\n", keyOut, certOut)
 	return nil
 }
 
+func createKeyAndCSR(cmd *cobra.Command, args []string) error {
+	// these are guaranteed to exist by the ExactArgs(2) in the Command
+	keyOut := args[0]
+	csrOut := args[1]
+
+	cn, err := cmd.Flags().GetString("cn")
+	if err != nil {
+		return err
+	}
+	o, err := cmd.Flags().GetStringSlice("o")
+	if err != nil {
+		return err
+	}
+	ou, err := cmd.Flags().GetStringSlice("ou")
+	if err != nil {
+		return err
+	}
+	durationStr, err := cmd.Flags().GetString("duration")
+	if err != nil {
+		return err
+	}
+	keyType, err := cmd.Flags().GetString("key-type")
+	if err != nil {
+		return err
+	}
+	sans, err := cmd.Flags().GetStringSlice("sans")
+	if err != nil {
+		return err
+	}
+	bundle, err := cmd.Flags().GetString("bundle")
+	if err != nil {
+		return err
+	}
+
+	duration, err := ParseDuration(durationStr)
+	if err != nil {
+		return err
+	}
+
+	req := certin.Request{
+		CN:       cn,
+		O:        o,
+		OU:       ou,
+		SANs:     sans,
+		Duration: duration,
+		KeyType:  keyType,
+	}
+
+	csr, err := certin.NewCSR(req)
+	if err != nil {
+		return err
+	}
+
+	err = certin.ExportKeyAndCSR(keyOut, csrOut, csr)
+	if err != nil {
+		return err
+	}
+
+	if bundle != "" {
+		err := fileConcat(bundle, keyOut, csrOut)
+		if err != nil {
+			return err
+		}
+		cmd.Printf("Success! Wrote: %s, %s, %s\n", keyOut, csrOut, bundle)
+		return nil
+	}
+
+	cmd.Printf("Success! Wrote: %s, %s\n", keyOut, csrOut)
+	return nil
+
+}
+
+// fileConcat creates a single file 'out' containing the contents of one or more files concatenated.
 func fileConcat(out string, in ...string) error {
 	f, err := os.Create(out)
 	if err != nil {
