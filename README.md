@@ -26,9 +26,11 @@ Usage:
 
 ```console
 $ certin create KEY CERT
+
 Flags:
       --bundle string        (optional) Create combined bundle FILE containing private-key, certificate, and signing CA cert
       --cn string            common name
+      --csr                  create a Certificate Signing Request (CSR) instead of a signed certificate
   -d, --duration string      certificate duration. Examples of valid values: 1w, 1d, 2d3h5m, 1h30m, 10s (default "1y")
   -h, --help                 help for create
       --is-ca                create a CA cert capable of signing other certs
@@ -74,6 +76,12 @@ certin create example.key example.crt \
   --key-type "ecdsa-256"
 ```
 
+* Generate certificate signing request (CSR) instead of a signed certificate:
+
+```console
+certin create example.key example.csr --cn example.com
+```
+
 Go Library
 ----------
 
@@ -99,6 +107,12 @@ type KeyAndCert struct {
 	Certificate *x509.Certificate
 	PrivateKey  crypto.PrivateKey
 	PublicKey   crypto.PublicKey
+}
+
+type KeyAndCSR struct {
+	CertificateRequest *x509.CertificateRequest
+	PrivateKey         crypto.PrivateKey
+	PublicKey          crypto.PublicKey
 }
 ```
 
@@ -151,6 +165,12 @@ templ := &x509.Certificate{
 cert, err := certin.NewCertFromX509Template(interm, "ecdsa-256", templ)
 ```
 
+* Generate certificate signing request (CSR) instead of a signed certificate:
+
+```go
+keyAndCSR, err := certin.NewCSR(Request{CN: "example.com", SANs: []string{"example.com", "www.example.com"}})
+```
+
 Motivation
 ----------
 
@@ -168,16 +188,3 @@ wanted something simpler and built specifically for the simplest test cases.
 I felt like the common cases for certs needed during testing should be generatable
 with a simple CLI and only a few command flags and common defaults, no config files or
 complex scripts.
-
-TODO
-----
-
-support CSRs:
-
-```go
-cert, err := NewCertFromCSR(root, crypto.PrivateKey, x509.CertificateRequest{})
-```
-
-```console
-certin sign ...
-```

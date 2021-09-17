@@ -296,7 +296,24 @@ func TestGenerateKey_ed25519(t *testing.T) {
 	}
 }
 
-func TestExportAndLoad(t *testing.T) {
+func TestNewCSR(t *testing.T) {
+	req := certin.Request{
+		CN:      "root CA",
+		KeyType: "rsa-3072",
+	}
+
+	csr, err := certin.NewCSR(req)
+	assert.Nil(t, err)
+
+	// verify cert attributes
+	assert.Equal(t, "root CA", csr.CertificateRequest.Subject.CommonName)
+
+	// verify key
+	assert.IsType(t, &rsa.PrivateKey{}, csr.PrivateKey)
+	assert.Equal(t, 3072, csr.PrivateKey.(*rsa.PrivateKey).N.BitLen())
+}
+
+func TestExportKeyAndCert_And_LoadKeyAndCert(t *testing.T) {
 	// TODO: go 1.15+, replace with the new TB.TempDir()
 	tempDir, cleanup := tempDir(t)
 	defer cleanup()
@@ -311,12 +328,36 @@ func TestExportAndLoad(t *testing.T) {
 		cert, err := certin.NewCert(nil, certin.Request{KeyType: algo})
 		assert.NoError(t, err)
 
-		err = certin.Export(keyFile, certFile, cert)
+		err = certin.ExportKeyAndCert(keyFile, certFile, cert)
 		assert.NoError(t, err)
 
 		loadedCert, err := certin.LoadKeyAndCert(keyFile, certFile)
 		assert.NoError(t, err)
 		assert.Equal(t, cert, loadedCert, "generated cert and cert loaded from disk are not equal")
+	}
+}
+
+func TestExportKeyAndCSR_And_LoadKeyAndCSR(t *testing.T) {
+	// TODO: go 1.15+, replace with the new TB.TempDir()
+	tempDir, cleanup := tempDir(t)
+	defer cleanup()
+
+	algos := []string{"rsa-2048", "ecdsa-256", "ed25519"}
+
+	for _, algo := range algos {
+		t.Log(algo)
+		keyFile := filepath.Join(tempDir, "test.key")
+		csrFile := filepath.Join(tempDir, "test.csr")
+
+		csr, err := certin.NewCSR(certin.Request{KeyType: algo})
+		assert.NoError(t, err)
+
+		err = certin.ExportKeyAndCSR(keyFile, csrFile, csr)
+		assert.NoError(t, err)
+
+		loadedCSR, err := certin.LoadKeyAndCSR(keyFile, csrFile)
+		assert.NoError(t, err)
+		assert.Equal(t, csr, loadedCSR, "generated CSR and CSR loaded from disk are not equal")
 	}
 }
 
