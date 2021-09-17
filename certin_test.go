@@ -7,10 +7,8 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"io/ioutil"
 	"math/big"
 	"net/url"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -314,9 +312,7 @@ func TestNewCSR(t *testing.T) {
 }
 
 func TestExportKeyAndCert_And_LoadKeyAndCert(t *testing.T) {
-	// TODO: go 1.15+, replace with the new TB.TempDir()
-	tempDir, cleanup := tempDir(t)
-	defer cleanup()
+	tempDir := t.TempDir()
 
 	algos := []string{"rsa-2048", "ecdsa-256", "ed25519"}
 
@@ -338,9 +334,7 @@ func TestExportKeyAndCert_And_LoadKeyAndCert(t *testing.T) {
 }
 
 func TestExportKeyAndCSR_And_LoadKeyAndCSR(t *testing.T) {
-	// TODO: go 1.15+, replace with the new TB.TempDir()
-	tempDir, cleanup := tempDir(t)
-	defer cleanup()
+	tempDir := t.TempDir()
 
 	algos := []string{"rsa-2048", "ecdsa-256", "ed25519"}
 
@@ -359,17 +353,4 @@ func TestExportKeyAndCSR_And_LoadKeyAndCSR(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, csr, loadedCSR, "generated CSR and CSR loaded from disk are not equal")
 	}
-}
-
-func tempDir(t *testing.T) (string, func()) {
-	tempDir, err := ioutil.TempDir("", t.Name())
-	if err != nil {
-		t.Fatalf("TempDir: %v", err)
-	}
-	cleanup := func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			t.Errorf("TempDir RemoveAll cleanup: %v", err)
-		}
-	}
-	return tempDir, cleanup
 }
