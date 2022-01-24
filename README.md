@@ -17,7 +17,7 @@ CLI
 
 Available options:
 
-* `go get -u github.com/joemiller/certin/cmd/certin`
+* Go 1.16+: `go install github.com/joemiller/certin/cmd/certin@latest`
 * macOS homebrew (Linuxbrew might work too): `brew install joemiller/taps/certin`
 * Binaries for all platforms (macOS, Linux, *BSD) on [GitHub Releases](https://github.com/joemiller/certin/releases)
 * [Docker images](https://hub.docker.com/r/joemiller/certin)
