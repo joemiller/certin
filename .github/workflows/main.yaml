@@ -28,10 +28,12 @@ jobs:
           echo "$HOME/bin" >> $GITHUB_PATH
         shell: bash # force windows to use git-bash for access to curl
 
-      - name: install goreleaser
+      - name: Install GoReleaser
         # only need to lint goreleaser on one platform:
         if: startsWith(runner.os, 'Linux')
-        run: curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | sudo sh -s -- -b /usr/local/bin
+        uses: goreleaser/goreleaser-action@v2
+        with:
+          install-only: true
 
       - run: make lint
         shell: bash
@@ -53,8 +55,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: install goreleaser
-        run: curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | sudo sh -s -- -b /usr/local/bin
+      - name: Install GoReleaser
+        if: startsWith(runner.os, 'Linux')
+        uses: goreleaser/goreleaser-action@v2
+        with:
+          install-only: true
+
       - run: make snapshot
 
   release:
@@ -85,8 +91,11 @@ jobs:
             git branch --track master origin/master
           fi
 
-      - name: install goreleaser
-        run: curl -sfL https://install.goreleaser.com/github.com/goreleaser/goreleaser.sh | sudo sh -s -- -b /usr/local/bin
+      - name: Install GoReleaser
+        if: startsWith(runner.os, 'Linux')
+        uses: goreleaser/goreleaser-action@v2
+        with:
+          install-only: true
 
       - name: run autotag to increment version
         run: |
