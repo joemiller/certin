@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
@@ -176,6 +177,23 @@ func NewCert(parent *KeyAndCert, req Request) (*KeyAndCert, error) {
 	return bundle, nil
 }
 
+// TLSCertificate returns a tls.Certificate suitable for use with: tls.Config{Certificates: k.TLSCertificate()}.
+func (k *KeyAndCert) TLSCertificate() tls.Certificate {
+	return tls.Certificate{
+		Certificate: [][]byte{k.Certificate.Raw},
+		PrivateKey:  k.PrivateKey,
+		Leaf:        k.Certificate,
+	}
+}
+
+// CertPool returns a *x509.CertPool suitable containing the certificate. Use this
+// with CA certs to generate a CertPool for use with: tls.Config{RootCAs: k.CertPool()}.
+func (k *KeyAndCert) CertPool() *x509.CertPool {
+	pool := x509.NewCertPool()
+	pool.AddCert(k.Certificate)
+	return pool
+}
+
 // NewCertFromX509Template creates a new keypair and certificate from an X509.Certificate template.
 // If parent is nil, it will be self-signed, otherwise it will be signed by the private key
 // and cert from the parent.
@@ -307,7 +325,7 @@ func ExportKeyAndCert(keyFile, certFile string, cert *KeyAndCert) error {
 	return nil
 }
 
-// ExportKeyAndCSR saves a private key and certficate request from a KeyAndCert to keyFile and csrFile.
+// ExportKeyAndCSR saves a private key and certficate request from a KeyAndCSR to keyFile and csrFile.
 func ExportKeyAndCSR(keyFile, csrFile string, csr *KeyAndCSR) error {
 	if err := ExportPrivateKey(keyFile, csr.PrivateKey); err != nil {
 		return err
@@ -318,7 +336,7 @@ func ExportKeyAndCSR(keyFile, csrFile string, csr *KeyAndCSR) error {
 	return nil
 }
 
-// ExportPrivateKey saves a private key in PEM format from a KeyAndCert to file.
+// ExportPrivateKey saves a private key in PEM format from a crypto.PrivateKey to file.
 func ExportPrivateKey(file string, priv crypto.PrivateKey) error {
 	derBytes, err := x509.MarshalPKCS8PrivateKey(priv)
 	if err != nil {
@@ -327,10 +345,10 @@ func ExportPrivateKey(file string, priv crypto.PrivateKey) error {
 	return ioutil.WriteFile(
 		file,
 		pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: derBytes}),
-		0600)
+		0o600)
 }
 
-// ExportPublicKey saves a public key in PEM format from a KeyAndCert to file.
+// ExportPublicKey saves a public key in PEM format from a crypto.PublicKey to file.
 func ExportPublicKey(file string, pub crypto.PublicKey) error {
 	derBytes, err := x509.MarshalPKIXPublicKey(pub)
 	if err != nil {
@@ -339,23 +357,23 @@ func ExportPublicKey(file string, pub crypto.PublicKey) error {
 	return ioutil.WriteFile(
 		file,
 		pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: derBytes}),
-		0600)
+		0o600)
 }
 
-// ExportCert saves a certificate in PEM format from a KeyAndCert to file.
+// ExportCert saves a certificate in PEM format from a *x509.Certificate to file.
 func ExportCert(file string, cert *x509.Certificate) error {
 	return ioutil.WriteFile(
 		file,
 		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}),
-		0600)
+		0o600)
 }
 
-// ExportCSR saves a certificate request in PEM format from a KeyAndCSR to file.
+// ExportCSR saves a certificate request in PEM format from a *x509.CertificateRequest to file.
 func ExportCSR(file string, csr *x509.CertificateRequest) error {
 	return ioutil.WriteFile(
 		file,
 		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csr.Raw}),
-		0600)
+		0o600)
 }
 
 // LoadKeyAndCert loads and parses a private key and certificate from keyFile and

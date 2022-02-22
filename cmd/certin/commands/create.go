@@ -230,7 +230,6 @@ func createKeyAndCSR(cmd *cobra.Command, args []string) error {
 
 	cmd.Printf("Success! Wrote: %s, %s\n", keyOut, csrOut)
 	return nil
-
 }
 
 // fileConcat creates a single file 'out' containing the contents of one or more files concatenated.
