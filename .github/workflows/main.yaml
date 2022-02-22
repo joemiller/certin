@@ -42,8 +42,8 @@ jobs:
 
   release-test:
     needs: [test]
-    # don't waste time running a goreleaser test build on master since we will run a full release:
-    if: github.ref != 'refs/heads/master'
+    # don't waste time running a goreleaser test build on main since we will run a full release:
+    if: github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -65,8 +65,8 @@ jobs:
 
   release:
     needs: [test]
-    # only create a release on master builds:
-    if: github.ref == 'refs/heads/master'
+    # only create a release on main builds:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -86,9 +86,9 @@ jobs:
           # and autotag can calculate the next version tag:
           git fetch --tags --unshallow --prune
 
-          if [ $(git rev-parse --abbrev-ref HEAD) != "master" ]; then
-            # ensure a local 'master' branch exists for autotag to work correctly:
-            git branch --track master origin/master
+          if [ $(git rev-parse --abbrev-ref HEAD) != "main" ]; then
+            # ensure a local 'main' branch exists for autotag to work correctly:
+            git branch --track main origin/main
           fi
 
       - name: Install GoReleaser
