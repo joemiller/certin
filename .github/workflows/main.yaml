@@ -5,7 +5,7 @@ jobs:
   test:
     strategy:
       matrix:
-        go-version: [1.15.x, 1.16.x, 1.17.x]
+        go-version: [1.17.x, 1.18.x, 1.19.x]
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     if: github.event_name == 'push' && !contains(toJson(github.event.commits), '[ci skip]') && !contains(toJson(github.event.commits), '[skip ci]')
@@ -21,10 +21,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
+      # TODO: switch to using the golangci-lint github action
       - name: install golangci-lint
         run: |
           mkdir -p "$HOME/bin"
-          curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b "$HOME/bin"
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b "$HOME/bin"
           echo "$HOME/bin" >> $GITHUB_PATH
         shell: bash # force windows to use git-bash for access to curl
 
@@ -49,7 +50,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-go@v2
         with:
-          go-version: 1.17.x
+          go-version: 1.19.x
       - uses: actions/cache@v1
         with:
           path: ~/go/pkg/mod
@@ -74,7 +75,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-go@v2
         with:
-          go-version: 1.17.x
+          go-version: 1.19.x
       - uses: actions/cache@v1
         with:
           path: ~/go/pkg/mod
