@@ -21,10 +21,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
+      # TODO: switch to using the golangci-lint github action
       - name: install golangci-lint
         run: |
           mkdir -p "$HOME/bin"
-          curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b "$HOME/bin"
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b "$HOME/bin"
           echo "$HOME/bin" >> $GITHUB_PATH
         shell: bash # force windows to use git-bash for access to curl
 
