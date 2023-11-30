@@ -18,7 +18,7 @@ builds:
       # - netbsd
     goarch:
       - amd64
-      - arm
+      # - arm
       - arm64
     goarm:
       - ""
