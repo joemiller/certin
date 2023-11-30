@@ -56,7 +56,7 @@ jobs:
 
       - uses: actions/setup-go@v4
         with:
-          go-version-file: go.mod
+          go-version: '1.21'
 
       - name: Install GoReleaser
         if: startsWith(runner.os, 'Linux')
@@ -79,7 +79,7 @@ jobs:
 
       - uses: actions/setup-go@v4
         with:
-          go-version-file: go.mod
+          go-version: '1.21'
 
       - name: docker.io login
         run: docker login docker.io -u joemiller -p ${{ secrets.DOCKERIO_TOKEN }}
