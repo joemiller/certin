@@ -5,21 +5,16 @@ jobs:
   test:
     strategy:
       matrix:
-        go-version: [1.17.x, 1.18.x, 1.19.x]
+        go-version: [1.19.x, 1.20.x, 1.21.x]
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     if: github.event_name == 'push' && !contains(toJson(github.event.commits), '[ci skip]') && !contains(toJson(github.event.commits), '[skip ci]')
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go-version }}
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v1
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
 
       # TODO: switch to using the golangci-lint github action
       - name: install golangci-lint
@@ -38,6 +33,7 @@ jobs:
 
       - run: make lint
         shell: bash
+
       - run: make test
         shell: bash
 
@@ -47,16 +43,11 @@ jobs:
     if: github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-go@v2
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v4
         with:
-          go-version: 1.19.x
-      - uses: actions/cache@v1
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+          go-version-file: go.mod
 
       - name: Install GoReleaser
         if: startsWith(runner.os, 'Linux')
@@ -72,29 +63,17 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-go@v2
+      - uses: actions/checkout@v4
         with:
-          go-version: 1.19.x
-      - uses: actions/cache@v1
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-go@v4
         with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+          go-version-file: go.mod
+
       - name: docker.io login
         run: docker login docker.io -u joemiller -p ${{ secrets.DOCKERIO_TOKEN }}
-
-      - name: Unshallow
-        run: |
-          # fetch all tags and history so that goreleaser can generate a proper changelog
-          # and autotag can calculate the next version tag:
-          git fetch --tags --unshallow --prune
-
-          if [ $(git rev-parse --abbrev-ref HEAD) != "main" ]; then
-            # ensure a local 'main' branch exists for autotag to work correctly:
-            git branch --track main origin/main
-          fi
 
       - name: Install GoReleaser
         if: startsWith(runner.os, 'Linux')
