@@ -17,7 +17,6 @@ builds:
       # - dragonfly
       # - netbsd
     goarch:
-      - 386
       - amd64
       - arm
       - arm64
@@ -37,8 +36,6 @@ archives:
   # archive releases containing: binary, readme, and license. tarballs (macos, linux), zip (windows)
   - id: archives
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
-    replacements:
-      386: i386
     format_overrides:
       - goos: windows
         format: zip
@@ -63,7 +60,7 @@ changelog:
 brews:
   - ids:
       - archives
-    tap:
+    repository:
       owner: joemiller
       name: homebrew-taps
     commit_author:
@@ -109,28 +106,3 @@ dockers:
       - "joemiller/certin:v{{ .Major }}-arm" # v1
       - "joemiller/certin:v{{ .Major }}.{{ .Minor }}-arm" # v1.0
       - "joemiller/certin:latest-arm"
-
-# ## generate RPM and DEB packages
-nfpms:
-  - id: certin
-    vendor: "Joe Miller"
-    homepage: "https://github.com/joemiller/certin"
-    maintainer: "certin@joemiller.me"
-    description: "Certin is a Go library and CLI for quickly creating keys and certificates for use as test fixtures."
-    license: MIT
-    formats:
-      - deb
-      - rpm
-    overrides:
-      rpm:
-        file_name_template: "{{ .ProjectName }}-{{ .Version }}-{{ .Arch }}"
-        replacements:
-          amd64: x86_64
-          386: i686
-          arm: armhfp
-          arm64: aarch64
-      deb:
-        file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-        replacements:
-          386: i386
-          arm: armel
