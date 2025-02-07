@@ -1,3 +1,5 @@
+version: 2
+
 project_name: certin
 
 builds:
@@ -31,20 +33,20 @@ builds:
 archives:
   # binary-only releases - all platforms
   - id: binaries
-    format: binary
+    formats: [binary]
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
   # archive releases containing: binary, readme, and license. tarballs (macos, linux), zip (windows)
   - id: archives
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
 
 checksum:
   name_template: "checksums.txt"
 
 snapshot:
-  name_template: "{{ .Tag }}-next"
+  version_template: "{{ .Tag }}-next"
 
 changelog:
   sort: asc
@@ -66,7 +68,7 @@ brews:
     commit_author:
       name: joe miller
       email: certin@joemiller.me
-    folder: Formula
+    directory: Formula
     homepage: "https://github.com/joemiller/certin"
     description: "Certin is a Go library and CLI for quickly creating keys and certificates for use as test fixtures."
 
