@@ -16,7 +16,7 @@ cov:
 	@go tool cover -html=cover.out
 
 build:
-	@go build ./cmd/certin
+	@CGO_ENABLED=0 go build -v -trimpath ./cmd/certin
 
 release:
 	@goreleaser $(GORELEASER_ARGS)
