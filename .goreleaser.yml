@@ -71,28 +71,28 @@ brews:
     directory: Formula
     homepage: "https://github.com/joemiller/certin"
     description: "Certin is a Go library and CLI for quickly creating keys and certificates for use as test fixtures."
-
-dockers:
-  # primary docker image for amd64 arch
-  - dockerfile: Dockerfile
-    ids:
-      - certin
-    goos: linux
-    goarch: amd64
-    image_templates:
-      - "joemiller/certin:{{ .Tag }}" # v1.0.0
-      - "joemiller/certin:v{{ .Major }}" # v1
-      - "joemiller/certin:v{{ .Major }}.{{ .Minor }}" # v1.0
-      - "joemiller/certin:latest"
-  # build a docker image for arm64 arch
-  - dockerfile: Dockerfile
-    ids:
-      - certin
-    goos: linux
-    goarch: arm64
-    goarm: ""
-    image_templates:
-      - "joemiller/certin:{{ .Tag }}-arm64" # v1.0.0
-      - "joemiller/certin:v{{ .Major }}-arm64" # v1
-      - "joemiller/certin:v{{ .Major }}.{{ .Minor }}-arm64" # v1.0
-      - "joemiller/certin:latest-arm64"
+# TODO(joem): re-enable docker builds and add a multi-arch manifest. Also switch to ghcr.io
+# dockers:
+#   # primary docker image for amd64 arch
+#   - dockerfile: Dockerfile
+#     ids:
+#       - certin
+#     goos: linux
+#     goarch: amd64
+#     image_templates:
+#       - "joemiller/certin:{{ .Tag }}" # v1.0.0
+#       - "joemiller/certin:v{{ .Major }}" # v1
+#       - "joemiller/certin:v{{ .Major }}.{{ .Minor }}" # v1.0
+#       - "joemiller/certin:latest"
+#   # build a docker image for arm64 arch
+#   - dockerfile: Dockerfile
+#     ids:
+#       - certin
+#     goos: linux
+#     goarch: arm64
+#     goarm: ""
+#     image_templates:
+#       - "joemiller/certin:{{ .Tag }}-arm64" # v1.0.0
+#       - "joemiller/certin:v{{ .Major }}-arm64" # v1
+#       - "joemiller/certin:v{{ .Major }}.{{ .Minor }}-arm64" # v1.0
+#       - "joemiller/certin:latest-arm64"
