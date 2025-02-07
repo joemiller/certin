@@ -15,6 +15,7 @@ import (
 
 	"github.com/joemiller/certin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCert_RootCA(t *testing.T) {
@@ -25,13 +26,13 @@ func TestNewCert_RootCA(t *testing.T) {
 	}
 
 	cert, err := certin.NewCert(nil, req)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	// verify cert attributes
 	assert.Equal(t, "root CA", cert.Certificate.Subject.CommonName)
-	assert.Equal(t, true, cert.Certificate.BasicConstraintsValid)
-	assert.Equal(t, true, cert.Certificate.IsCA)
-	assert.Equal(t, true, cert.Certificate.MaxPathLenZero)
+	assert.True(t, cert.Certificate.BasicConstraintsValid)
+	assert.True(t, cert.Certificate.IsCA)
+	assert.True(t, cert.Certificate.MaxPathLenZero)
 
 	// verify key
 	assert.IsType(t, &rsa.PrivateKey{}, cert.PrivateKey)
@@ -40,10 +41,10 @@ func TestNewCert_RootCA(t *testing.T) {
 
 func TestNewCert_Root_and_Intermediate(t *testing.T) {
 	root, err := certin.NewCert(nil, certin.Request{CN: "root", IsCA: true})
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	interm, err := certin.NewCert(root, certin.Request{CN: "intermediate", IsCA: true})
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, "root", root.Certificate.Subject.CommonName)
 	assert.Equal(t, "root", root.Certificate.Issuer.CommonName)
@@ -54,13 +55,13 @@ func TestNewCert_Root_and_Intermediate(t *testing.T) {
 
 func TestNewCert_Root_Intermediate_and_Leaf(t *testing.T) {
 	root, err := certin.NewCert(nil, certin.Request{CN: "root", IsCA: true})
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	interm, err := certin.NewCert(root, certin.Request{CN: "intermediate", IsCA: true})
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	leaf, err := certin.NewCert(interm, certin.Request{CN: "example.com"})
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, "root", root.Certificate.Subject.CommonName)
 	assert.Equal(t, "root", root.Certificate.Issuer.CommonName)
@@ -75,10 +76,10 @@ func TestNewCert_Root_Intermediate_and_Leaf(t *testing.T) {
 
 func TestKeyUsage(t *testing.T) {
 	root, err := certin.NewCert(nil, certin.Request{CN: "root", IsCA: true})
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	leaf, err := certin.NewCert(root, certin.Request{CN: "example.com"})
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	// CA certs should have the Cert Signing Key usage
 	assert.Equal(t, x509.KeyUsageCertSign, root.Certificate.KeyUsage)
@@ -89,11 +90,11 @@ func TestKeyUsage(t *testing.T) {
 
 func TestExtKeyUsage(t *testing.T) {
 	root, err := certin.NewCert(nil, certin.Request{CN: "root", IsCA: true})
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	sans := []string{"email@example.com"}
 	leaf, err := certin.NewCert(root, certin.Request{CN: "example.com", SANs: sans})
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Empty(t, root.Certificate.ExtKeyUsage)
 
@@ -116,7 +117,7 @@ func TestNewCert_SANs(t *testing.T) {
 		},
 	}
 	cert, err := certin.NewCert(nil, req)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	// IP addrs:
 	// IP byte arrays can be 4 or 16 in length, so we have to test each individual using net.IP.String()
@@ -154,13 +155,13 @@ func TestNewCertFromX509Template_RootCA(t *testing.T) {
 		MaxPathLenZero:        true,
 	}
 	cert, err := certin.NewCertFromX509Template(nil, "rsa-2048", templ)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	// verify cert attributes
 	assert.Equal(t, "root", cert.Certificate.Subject.CommonName)
-	assert.Equal(t, true, cert.Certificate.BasicConstraintsValid)
-	assert.Equal(t, true, cert.Certificate.IsCA)
-	assert.Equal(t, true, cert.Certificate.MaxPathLenZero)
+	assert.True(t, cert.Certificate.BasicConstraintsValid)
+	assert.True(t, cert.Certificate.IsCA)
+	assert.True(t, cert.Certificate.MaxPathLenZero)
 
 	// verify key (DeafultKeyType)
 	assert.IsType(t, &rsa.PrivateKey{}, cert.PrivateKey)
@@ -199,9 +200,9 @@ func TestGenerateKey_RSA(t *testing.T) {
 			key, err := certin.GenerateKey(tc.keytype)
 
 			if tc.shouldErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			if key != nil {
@@ -249,9 +250,9 @@ func TestGenerateKey_ECDSA(t *testing.T) {
 			key, err := certin.GenerateKey(tc.keytype)
 
 			if tc.shouldErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			if key != nil {
@@ -282,9 +283,9 @@ func TestGenerateKey_ed25519(t *testing.T) {
 			key, err := certin.GenerateKey(tc.keytype)
 
 			if tc.shouldErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			if key != nil {
@@ -301,7 +302,7 @@ func TestNewCSR(t *testing.T) {
 	}
 
 	csr, err := certin.NewCSR(req)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	// verify cert attributes
 	assert.Equal(t, "root CA", csr.CertificateRequest.Subject.CommonName)
@@ -322,13 +323,13 @@ func TestExportKeyAndCert_And_LoadKeyAndCert(t *testing.T) {
 		certFile := filepath.Join(tempDir, "test.crt")
 
 		cert, err := certin.NewCert(nil, certin.Request{KeyType: algo})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		err = certin.ExportKeyAndCert(keyFile, certFile, cert)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		loadedCert, err := certin.LoadKeyAndCert(keyFile, certFile)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, cert, loadedCert, "generated cert and cert loaded from disk are not equal")
 	}
 }
@@ -344,13 +345,13 @@ func TestExportKeyAndCSR_And_LoadKeyAndCSR(t *testing.T) {
 		csrFile := filepath.Join(tempDir, "test.csr")
 
 		csr, err := certin.NewCSR(certin.Request{KeyType: algo})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		err = certin.ExportKeyAndCSR(keyFile, csrFile, csr)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		loadedCSR, err := certin.LoadKeyAndCSR(keyFile, csrFile)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, csr, loadedCSR, "generated CSR and CSR loaded from disk are not equal")
 	}
 }

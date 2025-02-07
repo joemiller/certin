@@ -2,7 +2,6 @@ package commands
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
 
 	"github.com/joemiller/certin"
@@ -240,7 +239,7 @@ func fileConcat(out string, in ...string) error {
 	}
 
 	for _, i := range in {
-		b, err := ioutil.ReadFile(i)
+		b, err := os.ReadFile(i)
 		if err != nil {
 			return err
 		}

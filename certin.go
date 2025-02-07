@@ -7,18 +7,19 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha1"
+	"crypto/sha1" // #nosec: G505
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/pem"
+	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"net"
 	"net/mail"
 	"net/url"
+	"os"
 	"time"
 )
 
@@ -83,11 +84,11 @@ func NewCert(parent *KeyAndCert, req Request) (*KeyAndCert, error) {
 	}
 	priv, err := GenerateKey(req.KeyType)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate key: %v", err)
+		return nil, fmt.Errorf("failed to generate key: %w", err)
 	}
-	pub := priv.(crypto.Signer).Public()
+	pub := priv.(crypto.Signer).Public() //nolint:errcheck // false positive
 
-	skid, err := hashKeyId(pub)
+	skid, err := hashKeyID(pub)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +152,7 @@ func NewCert(parent *KeyAndCert, req Request) (*KeyAndCert, error) {
 		signerCert = parent.Certificate
 		signerKey = parent.PrivateKey
 
-		akid, err := hashKeyId(parent.PublicKey)
+		akid, err := hashKeyID(parent.PublicKey)
 		if err != nil {
 			return nil, err
 		}
@@ -161,12 +162,12 @@ func NewCert(parent *KeyAndCert, req Request) (*KeyAndCert, error) {
 	// return signKeyAndCert(self, signerCert, pub, signerKey)
 	certDER, err := x509.CreateCertificate(rand.Reader, self, signerCert, pub, signerKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign cert: %v", err)
+		return nil, fmt.Errorf("failed to sign cert: %w", err)
 	}
 
 	cert, err := x509.ParseCertificate(certDER)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse generated cert: %v", err)
+		return nil, fmt.Errorf("failed to parse generated cert: %w", err)
 	}
 
 	bundle := &KeyAndCert{
@@ -203,9 +204,9 @@ func NewCertFromX509Template(parent *KeyAndCert, keyType string, templ *x509.Cer
 	}
 	priv, err := GenerateKey(keyType)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate key: %v", err)
+		return nil, fmt.Errorf("failed to generate key: %w", err)
 	}
-	pub := priv.(crypto.Signer).Public()
+	pub := priv.(crypto.Signer).Public() //nolint:errcheck // false positive
 
 	// generate a random serial number if the template did not provide one. Go won't sign a cert without a serial
 	if templ.SerialNumber == nil {
@@ -228,12 +229,12 @@ func NewCertFromX509Template(parent *KeyAndCert, keyType string, templ *x509.Cer
 
 	certDER, err := x509.CreateCertificate(rand.Reader, templ, signerCert, pub, signerKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign cert: %v", err)
+		return nil, fmt.Errorf("failed to sign cert: %w", err)
 	}
 
 	cert, err := x509.ParseCertificate(certDER)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse generated cert: %v", err)
+		return nil, fmt.Errorf("failed to parse generated cert: %w", err)
 	}
 
 	bundle := &KeyAndCert{
@@ -251,9 +252,9 @@ func NewCSR(req Request) (*KeyAndCSR, error) {
 	}
 	priv, err := GenerateKey(req.KeyType)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate key: %v", err)
+		return nil, fmt.Errorf("failed to generate key: %w", err)
 	}
-	pub := priv.(crypto.Signer).Public()
+	pub := priv.(crypto.Signer).Public() //nolint:errcheck // false positive
 
 	templ := &x509.CertificateRequest{
 		Subject: pkix.Name{
@@ -270,12 +271,12 @@ func NewCSR(req Request) (*KeyAndCSR, error) {
 
 	csrDER, err := x509.CreateCertificateRequest(rand.Reader, templ, priv)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate certificate signing request: %v", err)
+		return nil, fmt.Errorf("failed to generate certificate signing request: %w", err)
 	}
 
 	csr, err := x509.ParseCertificateRequest(csrDER)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse generated certificate signing request: %v", err)
+		return nil, fmt.Errorf("failed to parse generated certificate signing request: %w", err)
 	}
 
 	bundle := &KeyAndCSR{
@@ -288,9 +289,10 @@ func NewCSR(req Request) (*KeyAndCSR, error) {
 }
 
 // GenerateKey generates a private/public key pair. Valid keytypes are:
-//   rsa-2048, rsa-3072, rsa-4096
-//   ecdsa-224, ecdsa-256, ecdsa-384, ecdsa-521
-//   ed25519
+//
+//	rsa-2048, rsa-3072, rsa-4096
+//	ecdsa-224, ecdsa-256, ecdsa-384, ecdsa-521
+//	ed25519
 func GenerateKey(keyType string) (crypto.PrivateKey, error) {
 	switch keyType {
 	case "rsa-2048":
@@ -340,9 +342,9 @@ func ExportKeyAndCSR(keyFile, csrFile string, csr *KeyAndCSR) error {
 func ExportPrivateKey(file string, priv crypto.PrivateKey) error {
 	derBytes, err := x509.MarshalPKCS8PrivateKey(priv)
 	if err != nil {
-		return fmt.Errorf("failed to encode private key: %v", err)
+		return fmt.Errorf("failed to encode private key: %w", err)
 	}
-	return ioutil.WriteFile(
+	return os.WriteFile(
 		file,
 		pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: derBytes}),
 		0o600)
@@ -352,9 +354,9 @@ func ExportPrivateKey(file string, priv crypto.PrivateKey) error {
 func ExportPublicKey(file string, pub crypto.PublicKey) error {
 	derBytes, err := x509.MarshalPKIXPublicKey(pub)
 	if err != nil {
-		return fmt.Errorf("failed to encode public key: %v", err)
+		return fmt.Errorf("failed to encode public key: %w", err)
 	}
-	return ioutil.WriteFile(
+	return os.WriteFile(
 		file,
 		pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: derBytes}),
 		0o600)
@@ -362,7 +364,7 @@ func ExportPublicKey(file string, pub crypto.PublicKey) error {
 
 // ExportCert saves a certificate in PEM format from a *x509.Certificate to file.
 func ExportCert(file string, cert *x509.Certificate) error {
-	return ioutil.WriteFile(
+	return os.WriteFile(
 		file,
 		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}),
 		0o600)
@@ -370,7 +372,7 @@ func ExportCert(file string, cert *x509.Certificate) error {
 
 // ExportCSR saves a certificate request in PEM format from a *x509.CertificateRequest to file.
 func ExportCSR(file string, csr *x509.CertificateRequest) error {
-	return ioutil.WriteFile(
+	return os.WriteFile(
 		file,
 		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csr.Raw}),
 		0o600)
@@ -391,7 +393,7 @@ func LoadKeyAndCert(keyFile string, certFile string) (*KeyAndCert, error) {
 	return &KeyAndCert{
 		Certificate: cert,
 		PrivateKey:  key,
-		PublicKey:   key.(crypto.Signer).Public(),
+		PublicKey:   key.(crypto.Signer).Public(), //nolint:errcheck // false positive
 	}, nil
 }
 
@@ -410,13 +412,13 @@ func LoadKeyAndCSR(keyFile, csrFile string) (*KeyAndCSR, error) {
 	return &KeyAndCSR{
 		CertificateRequest: csr,
 		PrivateKey:         key,
-		PublicKey:          key.(crypto.Signer).Public(),
+		PublicKey:          key.(crypto.Signer).Public(), //nolint:errcheck // false positive
 	}, nil
 }
 
 // LoadCert loads and parses a certificate from a PEM-formatted file and returns a *x509.Certificate.
 func LoadCert(file string) (*x509.Certificate, error) {
-	pemBytes, err := ioutil.ReadFile(file)
+	pemBytes, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
@@ -429,7 +431,7 @@ func LoadCert(file string) (*x509.Certificate, error) {
 
 // LoadCSR loads and parses a certificate request from a PEM-formatted file and returns a *x509.Certificate.
 func LoadCSR(file string) (*x509.CertificateRequest, error) {
-	pemBytes, err := ioutil.ReadFile(file)
+	pemBytes, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
@@ -442,7 +444,7 @@ func LoadCSR(file string) (*x509.CertificateRequest, error) {
 
 // LoadKey loads and parses a private key from file and returns a crypto.PrivateKey.
 func LoadKey(file string) (crypto.PrivateKey, error) {
-	pemBytes, err := ioutil.ReadFile(file)
+	pemBytes, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
@@ -461,13 +463,13 @@ func LoadKey(file string) (crypto.PrivateKey, error) {
 		case ed25519.PrivateKey:
 			return key, nil
 		default:
-			return nil, fmt.Errorf("Found unknown private key type in PKCS#8 wrapping")
+			return nil, errors.New("found unknown private key type in PKCS#8 wrapping")
 		}
 	}
 	if key, err := x509.ParseECPrivateKey(der.Bytes); err == nil {
 		return key, nil
 	}
-	return nil, fmt.Errorf("Failed to parse private key")
+	return nil, errors.New("failed to parse private key")
 }
 
 // appendAltNamesToCertificate parses a slice of SANs and append them to a &x509.Certificate
@@ -502,10 +504,10 @@ func appendAltNamesToCertificateRequest(csr *x509.CertificateRequest, sans []str
 	}
 }
 
-func hashKeyId(pub crypto.PublicKey) ([]byte, error) {
+func hashKeyID(pub crypto.PublicKey) ([]byte, error) {
 	spkiASN1, err := x509.MarshalPKIXPublicKey(pub)
 	if err != nil {
-		return []byte{}, fmt.Errorf("failed to marshal public key: %v", err)
+		return []byte{}, fmt.Errorf("failed to marshal public key: %w", err)
 	}
 
 	var spki struct {
@@ -514,10 +516,18 @@ func hashKeyId(pub crypto.PublicKey) ([]byte, error) {
 	}
 	_, err = asn1.Unmarshal(spkiASN1, &spki)
 	if err != nil {
-		return []byte{}, fmt.Errorf("failed to decode public key: %v", err)
+		return []byte{}, fmt.Errorf("failed to decode public key: %w", err)
 	}
 
-	skid := sha1.Sum(spki.SubjectPublicKey.Bytes)
+	// SubjectKeyId generated using method 1 in RFC 5280, Section 4.2.1.2:
+	//   (1) The keyIdentifier is composed of the 160-bit SHA-1 hash of the
+	//   value of the BIT STRING subjectPublicKey (excluding the tag,
+	//   length, and number of unused bits).
+	// TODO: we may change from SHA-1 to SHA-256 in the future. While go stdlib and
+	// many implementations follow RFC 5280's recommendation, it is not a requirement.
+	// In the interest of maximum compatibility, we stick to SHA-1 for now.
+	// Useful discussion and links are here: https://github.com/hashicorp/vault/issues/11153
+	skid := sha1.Sum(spki.SubjectPublicKey.Bytes) //nolint:gosec // sha1 is used for compatibility, see above
 	return skid[:], nil
 }
 
@@ -525,7 +535,7 @@ func randomSerialNumber() (*big.Int, error) {
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate serial number: %v", err)
+		return nil, fmt.Errorf("failed to generate serial number: %w", err)
 	}
 	return serialNumber, nil
 }
