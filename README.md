@@ -47,13 +47,13 @@ Examples:
 * self-signed cert:
 
 ```console
-certin create self-signed.key self-signed.crt
+certin create self-signed.key self-signed.crt --cn mycert
 ```
 
 * root CA:
 
 ```console
-certin create root.key root.crt --is-ca=true
+certin create root.key root.crt --is-ca=true --o MyCA --cn root-ca
 ```
 
 * intermediate CA:
@@ -62,6 +62,8 @@ certin create root.key root.crt --is-ca=true
 certin create intermediate.key intermediate.crt \
   --signer-key root.key \
   --signer-cert root.crt \
+  --o MyCA \
+  --cn int-ca \
   --is-ca
 ```
 
